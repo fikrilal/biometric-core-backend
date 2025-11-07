@@ -3,7 +3,7 @@
 This repository contains the backend for the Biometric Core platform, built with NestJS. The documentation is streamlined to focus on what matters for building and running the service.
 
 - Project Overview: docs/core/project-overview.md
-- Project Architecture: docs/core/architecture.md
+- Project Architecture: docs/core/project-architecture.md
 - Project Stack: docs/core/project-stack.md
 
 Development

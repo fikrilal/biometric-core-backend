@@ -155,3 +155,105 @@ biometric-core-backend/
 - Architecture Decision Records maintained alongside code; every change references compliance controls.
 - Threat modeling performed per feature (STRIDE/Kill Chain) with mitigations documented and tracked.
 - Regular security reviews, tabletop exercises, and disaster recovery drills with postmortem process feeding back into roadmap.
+
+## Monorepo Structure (Folders Only)
+
+```text
+biometric-core-backend/
+├─ apps/
+│  ├─ api-gateway/
+│  │  ├─ src/
+│  │  │  ├─ config/
+│  │  │  ├─ common/
+│  │  │  │  ├─ filters/
+│  │  │  │  ├─ guards/
+│  │  │  │  ├─ interceptors/
+│  │  │  │  ├─ decorators/
+│  │  │  │  └─ middleware/
+│  │  │  ├─ modules/
+│  │  │  │  ├─ health/
+│  │  │  │  ├─ auth/
+│  │  │  │  ├─ enrollment/
+│  │  │  │  ├─ users/
+│  │  │  │  ├─ devices/
+│  │  │  │  └─ repositories/
+│  │  │  └─ integrations/
+│  │  │     ├─ redis/
+│  │  │     ├─ prisma/
+│  │  │     └─ crypto/
+│  │  ├─ prisma/
+│  │  │  └─ migrations/
+│  │  ├─ test/
+│  │  │  ├─ unit/
+│  │  │  └─ e2e/
+│  │  └─ openapi/
+│  ├─ identity-service/
+│  ├─ enrollment-service/
+│  ├─ authentication-service/
+│  ├─ transaction-service/
+│  ├─ policy-service/
+│  ├─ risk-service/
+│  ├─ audit-service/
+│  └─ notification-service/
+├─ libs/
+│  ├─ domain/
+│  │  └─ src/
+│  │     ├─ users/
+│  │     ├─ devices/
+│  │     ├─ credentials/
+│  │     └─ challenges/
+│  ├─ dtos/
+│  │  └─ src/
+│  │     ├─ users/
+│  │     ├─ devices/
+│  │     └─ common/
+│  ├─ crypto/
+│  │  └─ src/
+│  │     ├─ jose/
+│  │     └─ kms/
+│  ├─ persistence/
+│  │  └─ src/
+│  │     ├─ prisma/
+│  │     └─ repositories/
+│  ├─ messaging/
+│  │  └─ src/
+│  │     ├─ events/
+│  │     ├─ producers/
+│  │     └─ consumers/
+│  ├─ policy/
+│  │  └─ src/
+│  │     ├─ rbac/
+│  │     └─ guards/
+│  ├─ observability/
+│  │  └─ src/
+│  │     ├─ logging/
+│  │     └─ tracing/
+│  └─ sdk/
+│        ├─ ts/
+│        └─ examples/
+├─ docs/
+│  ├─ core/
+│  ├─ openapi/
+│  ├─ adr/
+│  └─ runbooks/
+├─ infrastructure/
+│  ├─ terraform/
+│  │  ├─ modules/
+│  │  └─ envs/
+│  ├─ helm/
+│  │  ├─ charts/
+│  │  └─ values/
+│  └─ pipelines/
+│     ├─ github-actions/
+│     └─ scripts/
+├─ scripts/
+│  ├─ dev/
+│  ├─ codegen/
+│  └─ ci/
+├─ tests/
+│  ├─ integration/
+│  ├─ contract/
+│  └─ performance/
+│     └─ k6/
+└─ package.json
+```

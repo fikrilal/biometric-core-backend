@@ -1,0 +1,411 @@
+openapi: 3.1.0
+info:
+  title: Biometric Core Backend API
+  version: 0.1.0
+  description: >-
+    REST API for biometric enrollment, authentication, and device management.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: Health
+  - name: Auth
+  - name: Enrollment
+  - name: Users
+  - name: Devices
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    XRequestId:
+      in: header
+      name: X-Request-Id
+      required: false
+      schema: { type: string }
+      description: Optional request correlation ID. Echoed back in responses.
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      schema: { type: string }
+      description: Idempotency key for safely retrying mutating requests.
+    Cursor:
+      in: query
+      name: cursor
+      required: false
+      schema: { type: string }
+      description: Opaque pagination cursor.
+    Limit:
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 250
+        default: 25
+      description: Page size (default 25, max 250).
+  responses:
+    Problem:
+      description: Error response
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+  schemas:
+    ProblemDetails:
+      type: object
+      required: [type, title, status, traceId]
+      properties:
+        type: { type: string, description: A URI reference that identifies the problem type }
+        title: { type: string }
+        status: { type: integer, format: int32 }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: Machine-readable error code }
+        traceId: { type: string, description: Correlation/trace identifier }
+
+    User:
+      type: object
+      required: [id, email, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        createdAt: { type: string, format: date-time }
+
+    Device:
+      type: object
+      required: [id, userId, credentialId, active, createdAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        credentialId: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    AuthChallengeInput:
+      oneOf:
+        - type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+        - type: object
+          required: [userId]
+          properties:
+            userId: { type: string }
+      description: Identify the user to authenticate.
+
+    EnrollmentChallengeInput:
+      oneOf:
+        - type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+        - type: object
+          required: [userId]
+          properties:
+            userId: { type: string }
+      description: Identify the user to enroll a device for.
+
+    ChallengeResponse:
+      type: object
+      required: [challengeId, publicKeyCredentialOptions]
+      properties:
+        challengeId: { type: string }
+        publicKeyCredentialOptions:
+          type: object
+          description: WebAuthn options as per spec (opaque to clients).
+          additionalProperties: true
+
+    AuthVerifyInput:
+      type: object
+      required: [challengeId, credential]
+      properties:
+        challengeId: { type: string }
+        credential:
+          type: object
+          description: WebAuthn assertion response from the client.
+          additionalProperties: true
+
+    AuthVerifyResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, format: int32, description: Expiration in seconds }
+
+    EnrollmentVerifyInput:
+      type: object
+      required: [challengeId, credential]
+      properties:
+        challengeId: { type: string }
+        credential:
+          type: object
+          description: WebAuthn attestation response from the client.
+          additionalProperties: true
+
+    EnrollmentVerifyResponse:
+      type: object
+      required: [credentialId, deviceId]
+      properties:
+        credentialId: { type: string }
+        deviceId: { type: string }
+
+    CreateUserInput:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    PaginatedUser:
+      type: object
+      required: [items]
+      properties:
+        nextCursor: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+
+    PaginatedDevice:
+      type: object
+      required: [items]
+      properties:
+        nextCursor: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Device' }
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      operationId: getHealth
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /v1/auth/challenge:
+    post:
+      tags: [Auth]
+      summary: Create authentication challenge (WebAuthn assertion)
+      operationId: authCreateChallenge
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthChallengeInput' }
+      responses:
+        '200':
+          description: Challenge issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChallengeResponse' }
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /v1/auth/verify:
+    post:
+      tags: [Auth]
+      summary: Verify authentication assertion and issue tokens
+      operationId: authVerify
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthVerifyInput' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthVerifyResponse' }
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /v1/enroll/challenge:
+    post:
+      tags: [Enrollment]
+      summary: Create enrollment challenge (WebAuthn attestation)
+      operationId: enrollCreateChallenge
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnrollmentChallengeInput' }
+      responses:
+        '200':
+          description: Challenge issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChallengeResponse' }
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /v1/enroll/verify:
+    post:
+      tags: [Enrollment]
+      summary: Verify enrollment attestation and store credential
+      operationId: enrollVerify
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnrollmentVerifyInput' }
+      responses:
+        '200':
+          description: Device enrolled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnrollmentVerifyResponse' }
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /v1/users:
+    post:
+      tags: [Users]
+      summary: Create a user
+      operationId: createUser
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '409':
+          description: Conflict (e.g., email already exists)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Users]
+      summary: List users (cursor pagination)
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedUser' }
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get a user by id
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '404':
+          description: Not found
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/devices:
+    get:
+      tags: [Devices]
+      summary: List devices for current user/tenant
+      operationId: listDevices
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedDevice' }
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/devices/{id}:
+    delete:
+      tags: [Devices]
+      summary: Revoke a device by id
+      operationId: revokeDevice
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
