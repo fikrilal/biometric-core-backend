@@ -38,7 +38,7 @@ Deliver an enterprise-grade biometric authentication platform that financial ins
 
 ## Constraints & Assumptions
 
-- Deployment targets regulated cloud regions (AWS, Azure) with access to HSM/KMS services.
+- Deployment targets regulated cloud regions (AWS, Azure) with access to cloud KMS services.
 - Mobile clients integrate via native biometrics (FaceID, TouchID, Android Biometrics) mapped to platform passkeys.
 - All biometric processing happens on-device; backend accepts only signed assertions and attestation metadata.
 - Tenants require logical isolation, with optional dedicated infrastructure for premium customers.
@@ -53,7 +53,6 @@ Deliver an enterprise-grade biometric authentication platform that financial ins
 ## Open Questions
 
 - Tenant deployment model: multi-tenant with logical isolation vs. dedicated clusters?
-- Which cloud HSM provider(s) must be supported at launch?
+- Which cloud KMS provider(s) must be supported at launch?
 - Required compliance regimes per region (e.g., PSD2, FFIEC, MAS TRM) to calibrate controls.
 - Rollout strategy for legacy devices without native biometric support.
-

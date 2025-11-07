@@ -1,45 +1,40 @@
-# Biometric Core Backend – Technology Stack
+# Biometric Core Backend – Project Stack
 
 ## Runtime & Language
 
-- **Node.js 20 LTS + TypeScript** for primary services (performance, modern language features, broad ecosystem).
+- **Node.js 24 LTS + TypeScript** for primary services (performance, modern language features, broad ecosystem).
 - **TypeScript project references** via monorepo tooling to enforce explicit module boundaries.
 - **Native extensions (Rust/WASM)** reserved for crypto-heavy paths if benchmarks prove necessary.
 
 ## Service Frameworks & Libraries
 
-- **NestJS** as the default service framework: modular architecture, dependency injection, guards/interceptors for policy enforcement.
+- **NestJS** as the application framework: modular architecture, dependency injection, guards/interceptors for policy enforcement.
 - **Fastify adapter** for NestJS to maximize throughput and minimize overhead.
-- **tRPC or gRPC** for internal service communication where contract-first APIs and streaming are required.
-- **Zod** for schema validation and DTO typing; integrates with OpenAPI generator.
+- **class-validator + class-transformer** for DTO validation in controllers; **Zod** optional for shared library schemas and codegen.
 
 ## API Contracts & Client Integration
 
 - **REST + OpenAPI 3.1** exposed through API gateway; SDKs generated for web, mobile, and server-side clients.
 - **FIDO2/WebAuthn** using `@simplewebauthn/server` for registration and assertion verification.
 - **WebSockets/Server-Sent Events** for real-time challenge delivery and transaction status updates.
-- **gRPC/ConnectRPC** for internal service calls requiring low latency and strongly-typed contracts.
 
 ## Data & Storage
 
 - **PostgreSQL 15** with partitioned tables, row-level security, and pgcrypto for high-risk fields.
 - **Redis 7** for ephemeral challenge storage, rate limiting, and risk scoring caches.
-- **Kafka** (or Redpanda) for audit trails, event-driven workflows, and cross-service communication.
 - **Object storage (S3/Blob)** for encrypted artifacts (attestation evidence, compliance reports) with KMS-managed keys.
 - **Optional document store** (MongoDB/DocumentDB) dedicated to analytics or unstructured risk signals if required.
 
 ## Security & Cryptography
 
-- **Hardware-backed key management** via AWS CloudHSM or Azure Managed HSM; integrate through PKCS#11 clients.
-- **HashiCorp Vault** for secrets lifecycle management, database credential rotation, and transit encryption.
+- **Cloud KMS** (e.g., AWS KMS, GCP KMS) for managing signing/encryption keys.
 - **JOSE tooling** (`jose`, `node-webauthn`, custom wrappers) for JWT/JWS/JWE operations.
-- **OPA (Open Policy Agent)** for policy-as-code; embedded via sidecar or library depending on latency requirements.
 - **Device attestation** verification libraries from FIDO Alliance metadata service; regularly sync metadata statements.
 
 ## Observability & Operations
 
 - **OpenTelemetry SDK** for traces, metrics, and logs; exported to Tempo/Jaeger, Prometheus, and Loki/ELK respectively.
-- **Pino** for structured logging with redaction hooks for sensitive data.
+- **nestjs-pino** (Pino) for structured logging with redaction hooks for sensitive data.
 - **Grafana** dashboards with SLO burn rate indicators and business KPIs (enrollment success, auth latency).
 - **Feature flags** managed through LaunchDarkly or open-source alternatives (Unleash) to control rollouts.
 
@@ -49,7 +44,7 @@
 - **ESLint + Prettier + TypeScript ESLint** for linting/formatting, with security-focused rulesets.
 - **Jest + Supertest** for unit/integration testing; **k6** or **Artillery** for load testing.
 - **GitHub Actions** CI pipelines with CodeQL, Trivy, and dependency scanning (Snyk/OWASP Dependency-Check).
-- **Docker + Kubernetes** (EKS/AKS) for containerized deployment, leveraging **Istio/Linkerd** service mesh and mTLS.
+- **Docker + Kubernetes** (EKS/AKS) for containerized deployment.
 - **Terraform + Crossplane** for infrastructure as code and platform automation.
 - **Sigstore/cosign** for container signing; **SBOM** generation (Syft) to support supply-chain attestations.
 
@@ -62,7 +57,7 @@
 ## Developer Experience
 
 - **Storybook/Docs** for componentized SDK samples and integration guides.
-- **Local dev environment** via Docker Compose or Tilt, including ephemeral dependencies (Postgres, Redis, Kafka, Vault dev mode).
+- **Local dev environment** via Docker Compose or Tilt, including ephemeral dependencies (Postgres, Redis).
 - **ADR (Architecture Decision Records)** tracked alongside documentation to capture rationale over time.
 - **CLI tooling** (`oclif` or custom) to bootstrap tenants, rotate keys, and run diagnostic checks.
 
@@ -71,4 +66,3 @@
 - **Mobile push providers** (Firebase Cloud Messaging, APNS) for out-of-band approvals.
 - **Risk intelligence APIs** (ThreatMetrix, Feedzai) to complement in-house anomaly detection.
 - **Ticketing/Alerting** (PagerDuty, Opsgenie) tied into observability stack for incident response.
-

@@ -8,7 +8,7 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
 
 - **API Gateway & Edge**
   - Kong or Envoy with mutual TLS, request signing, rate limiting, and threat detection.
-  - Handles REST/OpenAPI traffic, forwarding gRPC and event streams to downstream services.
+  - Handles REST/OpenAPI traffic to downstream services.
 - **Identity Service**
   - Manages user accounts, tenant isolation, and credential metadata.
   - Issues session tokens and short-lived challenge tokens bound to device assertions.
@@ -17,12 +17,12 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
   - Persists attested public keys and device attributes without storing raw biometric data.
 - **Authentication Service**
   - Verifies signed assertions, enforces step-up policies, and integrates with risk scores.
-  - Publishes auth events to Kafka for analytics and compliance.
+  - Records authentication events for analytics and compliance.
 - **Transaction Approval Service**
   - Coordinates biometric confirmation for high-risk actions; generates cryptographic proofs of approval.
   - Supports out-of-band confirmations (push notifications, email) as fallbacks.
-- **Policy & Authorization Service**
-  - Policy-as-code (OPA) engine; centralizes tenant-specific rules, RBAC, and ABAC.
+- **Policy & Authorization**
+  - Centralizes tenant-specific rules, RBAC, and ABAC.
   - Evaluates contextual signals (device trust, geolocation, transaction metadata) before granting access.
 - **Risk & Anomaly Service**
   - Collects telemetry, device reputation, and behavioral signals; produces risk scores and recommendations.
@@ -46,38 +46,67 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
    1. Client requests login challenge → Authentication Service issues signed challenge with risk context.
    2. Client signs with registered credential; Authentication Service verifies signature and policy outcome.
    3. Identity Service issues session token; Audit Service records event.
-   4. Risk Service updates device trust score asynchronously via Kafka.
+   4. Risk Service updates device trust score asynchronously.
 3. **Transaction Approval**
-   1. Core banking system initiates approval request via gRPC/REST.
+   1. Core banking system initiates approval request via REST.
    2. Transaction Service triggers biometric challenge, optionally push notification.
    3. Upon successful assertion, service generates signed approval artifact, notifies initiator, and logs audit trail.
 4. **Revocation**
    1. Device flagged (user request, anomaly).
    2. Policy Service updates allowlist/denylist; Enrollment Service marks credential inactive.
-   3. Revocation broadcast on Kafka; Identity Service invalidates outstanding sessions, clients prompted to re-enroll.
+   3. Revocation propagated to dependent components; Identity Service invalidates outstanding sessions, clients prompted to re-enroll.
 
 ## Security Architecture
 
-- **Zero Trust Network** – service mesh enforces mTLS, SPIFFE-issued identities, and per-route authorization.
-- **Hardware Security Modules** – signing keys, encryption keys, and token secrets managed within HSM/KMS.
-- **Secrets Management** – Vault brokers dynamic credentials and short-lived certificates.
-- **Policy Enforcement Points** – Nest guards/interceptors and Istio authorization policies call Policy Service/OPA.
-- **Data Protection** – Pseudonymization for user identifiers, transparent encryption (pgcrypto) for sensitive fields, envelope encryption for stored artifacts.
-- **Continuous Monitoring** – anomaly detection, drift detection (Terraform + Conftest), runtime protection (Falco/Aqua).
+- Transport security – TLS on all external endpoints; optional mTLS at ingress or between components where required.
+- Key management – cloud KMS for signing/encryption keys; rotate regularly and segment by environment/tenant.
+- Secrets management – environment variables and cloud secret managers; avoid committing secrets.
+- Policy enforcement – implemented in-app via Nest guards and interceptors.
+- Data protection – pseudonymization for user identifiers, pgcrypto for sensitive fields, envelope encryption for stored artifacts when necessary.
+- Continuous monitoring – anomaly detection, drift detection (Terraform + Conftest), and runtime protection as needed.
 
 ## Reliability & Scalability
 
-- Stateless services scale horizontally behind autoscalers; stateful components (Postgres, Redis, Kafka) deployed in HA clusters.
+- Scale the Nest application horizontally; stateful components (Postgres, Redis) run in HA configurations.
 - Read replicas and partitioned tables support tenant isolation and high throughput.
 - SLO-driven autoscaling triggered by custom metrics (challenge latency, queue backlogs).
-- Chaos engineering and load testing pipelines validate failover characteristics and backpressure handling.
+- Load testing validates failover characteristics and backpressure handling.
 
 ## Deployment Model
 
-- **Kubernetes (EKS/AKS/GKE)** with multi-tenant namespaces; dedicated clusters for regulated tenants if required.
-- **GitOps** (ArgoCD/Flux) for declarative deployments; progressive delivery (canary, blue/green) via service mesh.
-- **Infrastructure as Code** (Terraform + Crossplane) controls network segmentation, HSM, database provisioning.
+- **Kubernetes (EKS/AKS/GKE)** or simple VM/container environments depending on scale.
+- **GitOps** (ArgoCD/Flux) or CI-based deployments for declarative releases and progressive delivery.
+- **Infrastructure as Code** (Terraform + Crossplane) for network segmentation and database provisioning.
 - **Environment tiers** (dev, staging, prod) with promotion gates tied to automated checks and manual approval for prod.
+
+## Nest Application Architecture (Modular Monolith)
+
+- Module boundaries
+  - AppModule composes feature modules and infrastructure modules.
+  - Feature modules: Auth, Identity, Tenants, Enrollment, Authentication, Transaction, Policy, Risk, Audit, Notifications.
+  - Infrastructure modules: Config, Database, Cache (Redis), Queue, Observability, Crypto, External Vendors.
+- Request lifecycle
+  - HTTP (Fastify) → global pipes (validation) → guards (authN/Z) → interceptors (logging, metrics) → controller → service → repository/client → response mapping.
+  - Errors mapped via an HttpExceptionFilter; domain errors converted to canonical problem responses.
+- Validation
+  - DTOs validated with class-validator/class-transformer; strict whitelist and forbidUnknownValues globally.
+  - Schema-level validation for cross-field constraints in services.
+- Configuration
+  - @nestjs/config provides typed config namespaces; environment validated on boot (Joi or Zod) and injected via ConfigService.
+  - Secrets pulled from runtime environment or a cloud secret manager; never committed.
+- Persistence
+  - Prisma repositories encapsulated behind interfaces; services depend on repository ports, not Prisma directly.
+  - Transactions handled in services; idempotency keys used for enrollment/auth flows.
+- Messaging & jobs
+  - BullMQ queues for heavy/async work (risk scoring, audit export, metadata sync).
+  - Outbox pattern optional for reliable event publication if/when an event bus is introduced.
+- Security controls in-process
+  - Guards enforce tenant scoping and RBAC/ABAC policy checks.
+  - Interceptors add request IDs, sanitize logs, and emit metrics/traces.
+- Testing strategy
+  - Unit: providers with in-memory fakes or test doubles.
+  - Integration: Nest testing module + Supertest over Fastify adapter.
+  - E2E: containerized Postgres/Redis via Testcontainers; seed fixtures and run Jest suites.
 
 ## Project Structure (Monorepo Proposal)
 
@@ -89,16 +118,16 @@ biometric-core-backend/
 │   ├── enrollment-service/     # Device registration & attestation workflows
 │   ├── authentication-service/ # Assertion validation & token issuance
 │   ├── transaction-service/    # Transaction approval orchestration
-│   ├── policy-service/         # OPA policies, authorization decisions
+│   ├── policy-service/         # Authorization decisions
 │   ├── risk-service/           # Risk scoring pipelines & integrations
 │   ├── audit-service/          # Audit logging, compliance exports
 │   └── notification-service/   # Push/email transports and templates
 ├── libs/
 │   ├── domain/                 # Aggregates, entities, domain events
 │   ├── dtos/                   # Shared DTOs, Zod schemas, protobuf definitions
-│   ├── crypto/                 # Cryptographic helpers, HSM/KMS adapters
+│   ├── crypto/                 # Cryptographic helpers, KMS adapters
 │   ├── persistence/            # Database repositories, migrations, RLS utilities
-│   ├── messaging/              # Kafka producers/consumers, event definitions
+│   ├── messaging/              # Event definitions (if/when an event bus is introduced)
 │   ├── policy/                 # Policy evaluation clients, guard utilities
 │   ├── observability/          # OTEL setup, logging formatters
 │   └── sdk/                    # Client SDK scaffolding for web/mobile/server
@@ -117,14 +146,12 @@ biometric-core-backend/
 
 ## Evolution Path
 
-- **Phase 1:** Deploy as modular monolith within single Nest application; enforce boundaries through module imports and shared library contracts.
-- **Phase 2:** Extract high-churn or high-load services (Authentication, Enrollment) into independently deployable Nest applications communicating over gRPC.
-- **Phase 3:** Introduce polyglot services (e.g., Go risk scoring pipelines or Rust crypto workers) behind stable interfaces when performance data justifies.
-- **Phase 4:** Full multi-region active-active deployment with global load balancing and regional data residency controls.
+- **Phase 1:** Deploy as modular monolith within a single Nest application; enforce boundaries through module imports and shared library contracts.
+- **Phase 2:** If needed, extract high-churn or high-load modules into separate Nest applications communicating over internal HTTP or simple queues.
+- **Phase 3:** Consider additional services or languages only if performance data justifies, keeping interfaces simple.
 
 ## Documentation & Governance
 
 - Architecture Decision Records maintained alongside code; every change references compliance controls.
 - Threat modeling performed per feature (STRIDE/Kill Chain) with mitigations documented and tracked.
 - Regular security reviews, tabletop exercises, and disaster recovery drills with postmortem process feeding back into roadmap.
-

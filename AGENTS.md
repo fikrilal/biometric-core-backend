@@ -1,0 +1,55 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+Until the Nest app is scaffolded, source lives mainly in `docs/`. The intended layout:
+
+```
+biometric-core-backend/
+├─ src/                    # Nest application (to be added)
+│  ├─ app.module.ts
+│  ├─ common/              # filters, guards, interceptors, utils
+│  └─ modules/             # feature modules (identity, enrollment, auth, tx)
+├─ prisma/                 # schema + migrations
+├─ tests/                  # unit/e2e tests
+├─ docs/core/              # overview, architecture, stack
+└─ scripts/                # dev/ops scripts
+```
+
+## Build, Test, and Development Commands
+
+- Node version: use `nvm use` (Node 24 LTS). If needed: `nvm install 24`.
+- After scaffold (package.json present):
+  - `npm i` — install deps
+  - `npm run start:dev` — run Nest (Fastify) in watch mode
+  - `npm run test` / `npm run test:e2e` — run unit/e2e tests
+  - `npm run build` — compile TypeScript to `dist/`
+  - `npm run lint` / `npm run format` — lint and format code
+- Env: `cp .env.example .env` and edit values. Optional: `docker compose up -d` for Postgres/Redis when added.
+
+## Coding Style & Naming Conventions
+
+- Language: TypeScript (2‑space indent, no semicolon preference enforced by Prettier).
+- Tools: ESLint + Prettier + TypeScript ESLint.
+- Naming: `camelCase` vars/functions, `PascalCase` classes, `SCREAMING_SNAKE_CASE` constants.
+- Nest patterns: `feature.module.ts`, `feature.controller.ts`, `feature.service.ts`, DTOs end with `.dto.ts`.
+
+## Testing Guidelines
+
+- Frameworks: Jest (unit), Supertest (e2e).
+- Location: `*.spec.ts` colocated with code or under `tests/`.
+- Aim for ≥80% coverage on core modules; mock external IO.
+- E2E tests may spin up Postgres/Redis via Docker/Testcontainers when introduced.
+
+## Commit & Pull Request Guidelines
+
+- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+- PRs: include what/why, linked issues, and update docs when behavior or APIs change.
+- Keep PRs focused and small; run lint/tests locally before opening.
+
+## Security & Configuration Tips
+
+- Never commit secrets. Use `.env` + `.env.example`; store real secrets in a secret manager.
+- Validate env on boot; prefer least privilege for DB users.
+- Do not store raw biometric data; persist only necessary, privacy‑preserving artifacts.
+
