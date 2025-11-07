@@ -155,6 +155,7 @@ biometric-core-backend/
 - Architecture Decision Records maintained alongside code; every change references compliance controls.
 - Threat modeling performed per feature (STRIDE/Kill Chain) with mitigations documented and tracked.
 - Regular security reviews, tabletop exercises, and disaster recovery drills with postmortem process feeding back into roadmap.
+- Response shape and error format are standardized; see `docs/standards/response-standard.md`.
 
 ## Monorepo Structure (Folders Only)
 

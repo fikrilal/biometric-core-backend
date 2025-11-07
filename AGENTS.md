@@ -34,6 +34,8 @@ biometric-core-backend/
 - Naming: `camelCase` vars/functions, `PascalCase` classes, `SCREAMING_SNAKE_CASE` constants.
 - Nest patterns: `feature.module.ts`, `feature.controller.ts`, `feature.service.ts`, DTOs end with `.dto.ts`.
 
+See also: API response standard in `docs/standards/response-standard.md`.
+
 ## Testing Guidelines
 
 - Frameworks: Jest (unit), Supertest (e2e).

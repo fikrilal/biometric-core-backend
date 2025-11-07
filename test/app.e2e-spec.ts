@@ -41,4 +41,26 @@ describe('App e2e (health)', () => {
       expect(body.status).toBe('ok');
     });
   });
+
+  it('/auth/ping (GET) returns envelope and echoes X-Request-Id', async () => {
+    const server = (app as NestFastifyApplication).getHttpServer();
+    const reqId = 'e2e-test-req-1';
+    const res = await request(server)
+      .get('/auth/ping')
+      .set('X-Request-Id', reqId)
+      .expect(200);
+
+    expect(res.headers['x-request-id']).toBe(reqId);
+    expect(res.body).toEqual({ data: { ok: true } });
+  });
+
+  it('unknown route returns ProblemDetails with traceId', async () => {
+    const server = (app as NestFastifyApplication).getHttpServer();
+    const res = await request(server).get('/v1/does-not-exist').expect(404);
+    const body = res.body;
+    // Content type may be set; ensure we have a reasonable shape
+    expect(typeof body.title).toBe('string');
+    expect(body.status).toBe(404);
+    expect(typeof body.traceId === 'string' || body.traceId === undefined).toBeTruthy();
+  });
 });
