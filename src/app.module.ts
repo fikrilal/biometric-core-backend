@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnv } from './config/env.validation';
@@ -6,6 +7,9 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
+import { ResponseEnvelopeInterceptor } from './common/http/interceptors/response-envelope.interceptor';
+import { RequestIdInterceptor } from './common/http/interceptors/request-id.interceptor';
+import { ProblemDetailsFilter } from './common/http/filters/problem-details.filter';
 
 @Module({
   imports: [
@@ -20,6 +24,11 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
     HealthModule,
     AuthModule,
+  ],
+  providers: [
+    { provide: APP_INTERCEPTOR, useClass: RequestIdInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },
+    { provide: APP_FILTER, useClass: ProblemDetailsFilter },
   ],
 })
 export class AppModule {}
