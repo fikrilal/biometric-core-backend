@@ -53,3 +53,20 @@ biometric-core-backend/
 - Validate env on boot; prefer least privilege for DB users.
 - Do not store raw biometric data; persist only necessary, privacy‑preserving artifacts.
 
+## Tooling Tips (Node & WSL)
+
+- Standard Node: 24 LTS. Prefer running Node/NPM from Windows when developing inside WSL to avoid shim issues.
+- Install Node 24 on Windows
+  - nvm‑windows: `winget install CoreyButler.NVMforWindows` → `nvm install 24.11.0` → `nvm use 24.11.0`
+  - Or install Node 24 LTS MSI from nodejs.org.
+- Use Windows Node/NPM from WSL (run in repo root)
+  - Install deps: `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" ci`
+  - Dev server: `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" run start:dev`
+  - Prisma generate: `cmd.exe /C "%APPDATA%\npm\npx.cmd" prisma generate`
+  - Prisma migrate: `cmd.exe /C "%APPDATA%\npm\npx.cmd" prisma migrate dev`
+  - Tests (e2e): `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" run test:e2e --silent`
+  - Build: `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" run build`
+- Environment & services
+  - `cp .env.example .env` and set `REDIS_URL=redis://localhost:6380` (compose maps 6380→6379).
+  - Start deps: `docker compose up -d`. Remove `version:` from compose to silence the warning.
+- If commands fail due to environment or permissions, don’t force execution—surface the error and request access/approval instead.
