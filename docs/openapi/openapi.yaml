@@ -19,6 +19,16 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  headers:
+    XRequestId:
+      description: Correlation ID echoed back on all responses.
+      schema: { type: string }
+    IdempotencyReplayed:
+      description: True when a request with the same Idempotency-Key was replayed and a cached result is returned.
+      schema: { type: boolean }
+    Location:
+      description: Absolute or path URL of the created resource.
+      schema: { type: string }
   parameters:
     XRequestId:
       in: header
@@ -56,6 +66,11 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
   schemas:
+    Meta:
+      type: object
+      properties:
+        nextCursor: { type: string, nullable: true }
+        limit: { type: integer, minimum: 1, maximum: 250 }
     ProblemDetails:
       type: object
       required: [type, title, status, traceId]
@@ -161,23 +176,48 @@ components:
       properties:
         email: { type: string, format: email }
 
-    PaginatedUser:
+    EnvelopeUser:
       type: object
-      required: [items]
+      required: [data]
       properties:
-        nextCursor: { type: string, nullable: true }
-        items:
+        data: { $ref: '#/components/schemas/User' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    EnvelopeUsers:
+      type: object
+      required: [data]
+      properties:
+        data:
           type: array
           items: { $ref: '#/components/schemas/User' }
+        meta: { $ref: '#/components/schemas/Meta' }
 
-    PaginatedDevice:
+    EnvelopeDevices:
       type: object
-      required: [items]
+      required: [data]
       properties:
-        nextCursor: { type: string, nullable: true }
-        items:
+        data:
           type: array
           items: { $ref: '#/components/schemas/Device' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    EnvelopeChallengeResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/ChallengeResponse' }
+
+    EnvelopeAuthVerifyResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/AuthVerifyResponse' }
+
+    EnvelopeEnrollmentVerifyResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/EnrollmentVerifyResponse' }
 
 paths:
   /health:
@@ -198,6 +238,9 @@ paths:
                   status:
                     type: string
                     enum: [ok]
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -219,7 +262,12 @@ paths:
           description: Challenge issued
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ChallengeResponse' }
+              schema: { $ref: '#/components/schemas/EnvelopeChallengeResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -241,7 +289,12 @@ paths:
           description: Authenticated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AuthVerifyResponse' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthVerifyResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -263,7 +316,12 @@ paths:
           description: Challenge issued
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ChallengeResponse' }
+              schema: { $ref: '#/components/schemas/EnvelopeChallengeResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -285,7 +343,12 @@ paths:
           description: Device enrolled
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnrollmentVerifyResponse' }
+              schema: { $ref: '#/components/schemas/EnvelopeEnrollmentVerifyResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -307,7 +370,12 @@ paths:
           description: Created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema: { $ref: '#/components/schemas/EnvelopeUser' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Location:
+              $ref: '#/components/headers/Location'
         '409':
           description: Conflict (e.g., email already exists)
           content:
@@ -331,7 +399,10 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PaginatedUser' }
+              schema: { $ref: '#/components/schemas/EnvelopeUsers' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
       security:
@@ -353,7 +424,10 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema: { $ref: '#/components/schemas/EnvelopeUser' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         '404':
           description: Not found
           content:
@@ -378,7 +452,10 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PaginatedDevice' }
+              schema: { $ref: '#/components/schemas/EnvelopeDevices' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
       security:
@@ -399,6 +476,9 @@ paths:
       responses:
         '204':
           description: Deleted
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         '404':
           description: Not found
           content:
@@ -408,4 +488,3 @@ paths:
           $ref: '#/components/responses/Problem'
       security:
         - bearerAuth: []
-

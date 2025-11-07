@@ -5,6 +5,7 @@ This repository contains the backend for the Biometric Core platform, built with
 - Project Overview: docs/core/project-overview.md
 - Project Architecture: docs/core/project-architecture.md
 - Project Stack: docs/core/project-stack.md
+ - API Response Standard: docs/standards/response-standard.md
 
 Development
 - Node.js 24 LTS is the project standard. Use `nvm use` (reads `.nvmrc`) to match the correct version.
