@@ -2,6 +2,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import { fileURLToPath } from 'node:url';
 
 export default [
   { ignores: ['dist/**', 'coverage/**', 'node_modules/**'] },
@@ -14,6 +15,11 @@ export default [
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
+        ecmaFeatures: {
+          legacyDecorators: true,
+        },
+        project: ['./tsconfig.json'],
+        tsconfigRootDir: fileURLToPath(new URL('.', import.meta.url)),
       },
     },
     plugins: { '@typescript-eslint': tseslint.plugin },

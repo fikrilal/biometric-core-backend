@@ -20,6 +20,13 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await this.client.quit();
+    try {
+      if (this.client.status === 'end' || this.client.status === 'wait') {
+        return;
+      }
+      await this.client.quit();
+    } catch {
+      this.client.disconnect();
+    }
   }
 }

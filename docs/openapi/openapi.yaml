@@ -85,10 +85,12 @@ components:
 
     User:
       type: object
-      required: [id, email, createdAt]
+      required: [id, email, firstName, lastName, createdAt]
       properties:
         id: { type: string }
         email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
         createdAt: { type: string, format: date-time }
 
     Device:

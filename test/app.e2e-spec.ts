@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import * as request from 'supertest';
 import { Logger } from 'nestjs-pino';
@@ -22,6 +22,9 @@ describe('App e2e (health)', () => {
 
     app = await moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
       bufferLogs: true,
+    });
+    app.setGlobalPrefix('v1', {
+      exclude: [{ path: 'health', method: RequestMethod.GET }],
     });
     app.useLogger(app.get(Logger));
     app.useGlobalPipes(
@@ -62,5 +65,36 @@ describe('App e2e (health)', () => {
     expect(typeof body.title).toBe('string');
     expect(body.status).toBe(404);
     expect(typeof body.traceId === 'string' || body.traceId === undefined).toBeTruthy();
+  });
+
+  it('users module supports create/list/get', async () => {
+    const server = (app as NestFastifyApplication).getHttpServer();
+    const email = `user-${Date.now()}@example.com`;
+    const firstName = 'Test';
+    const lastName = 'User';
+
+    const createRes = await request(server)
+      .post('/v1/users')
+      .set('Idempotency-Key', `idem-${Date.now()}`)
+      .send({ email, firstName, lastName })
+      .expect(201);
+
+    expect(createRes.headers['location']).toMatch(/\/v1\/users\//);
+    expect(createRes.body.data.email).toBe(email);
+    expect(createRes.body.data.firstName).toBe(firstName);
+    expect(createRes.body.data.lastName).toBe(lastName);
+    const userId = createRes.body.data.id;
+
+    const listRes = await request(server)
+      .get('/v1/users?limit=1')
+      .expect(200);
+    expect(Array.isArray(listRes.body.data)).toBe(true);
+    expect(listRes.body.meta).toHaveProperty('limit');
+
+    const getRes = await request(server).get(`/v1/users/${userId}`).expect(200);
+    expect(getRes.body.data.id).toBe(userId);
+    expect(getRes.body.data.email).toBe(email);
+    expect(getRes.body.data.firstName).toBe(firstName);
+    expect(getRes.body.data.lastName).toBe(lastName);
   });
 });

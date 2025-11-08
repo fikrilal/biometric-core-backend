@@ -27,11 +27,11 @@ class EnvVars {
   LOG_LEVEL?: string;
 }
 
-export function validateEnv(config: Record<string, unknown>) {
+export function validateEnv(config: Record<string, unknown>): EnvVars {
   const validated = plainToInstance(EnvVars, config, { enableImplicitConversion: true });
   const errors = validateSync(validated, { skipMissingProperties: false });
   if (errors.length > 0) {
     throw new Error(errors.map((e) => JSON.stringify(e.constraints)).join(', '));
   }
-  return validated as Record<string, unknown>;
+  return validated;
 }

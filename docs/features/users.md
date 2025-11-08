@@ -1,7 +1,7 @@
 # Users Module – Specification
 
 ## Purpose
-Manage user accounts with unique email, minimal profile, and lookups supporting pagination. Used by both password-based auth and biometric linking.
+Manage user accounts with unique email + basic identity (first/last name) and lookups supporting pagination. Used by both password-based auth and biometric linking.
 
 ## Endpoints (v1)
 - POST `/v1/users` — create user (admin/service context)
@@ -13,6 +13,7 @@ All responses use the envelope `{ data, meta? }`. Errors follow RFC 7807.
 ## Requests & Validation
 - CreateUserInput
   - `email` (string, email)
+  - `firstName`, `lastName` (strings)
   - Reject duplicates with 409 Conflict (`code: CONFLICT`).
 - List
   - `cursor?` (string, base64url), `limit?` (1–250; default 25)

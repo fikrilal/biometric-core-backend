@@ -11,6 +11,7 @@ import { ResponseEnvelopeInterceptor } from './common/http/interceptors/response
 import { RequestIdInterceptor } from './common/http/interceptors/request-id.interceptor';
 import { ProblemDetailsFilter } from './common/http/filters/problem-details.filter';
 import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.interceptor';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.i
     RedisModule,
     HealthModule,
     AuthModule,
+    UsersModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
