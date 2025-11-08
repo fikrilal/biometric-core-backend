@@ -10,6 +10,7 @@ import { RedisModule } from './redis/redis.module';
 import { ResponseEnvelopeInterceptor } from './common/http/interceptors/response-envelope.interceptor';
 import { RequestIdInterceptor } from './common/http/interceptors/request-id.interceptor';
 import { ProblemDetailsFilter } from './common/http/filters/problem-details.filter';
+import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.interceptor';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ProblemDetailsFilter } from './common/http/filters/problem-details.filt
     AuthModule,
   ],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
     { provide: APP_INTERCEPTOR, useClass: RequestIdInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },

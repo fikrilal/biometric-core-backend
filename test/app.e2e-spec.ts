@@ -42,11 +42,11 @@ describe('App e2e (health)', () => {
     });
   });
 
-  it('/auth/ping (GET) returns envelope and echoes X-Request-Id', async () => {
+  it('/v1/auth/ping (GET) returns envelope and echoes X-Request-Id', async () => {
     const server = (app as NestFastifyApplication).getHttpServer();
     const reqId = 'e2e-test-req-1';
     const res = await request(server)
-      .get('/auth/ping')
+      .get('/v1/auth/ping')
       .set('X-Request-Id', reqId)
       .expect(200);
 

@@ -2,18 +2,31 @@
 
 ## Project Structure & Module Organization
 
-Until the Nest app is scaffolded, source lives mainly in `docs/`. The intended layout:
-
 ```
 biometric-core-backend/
-├─ src/                    # Nest application (to be added)
-│  ├─ app.module.ts
-│  ├─ common/              # filters, guards, interceptors, utils
-│  └─ modules/             # feature modules (identity, enrollment, auth, tx)
-├─ prisma/                 # schema + migrations
-├─ tests/                  # unit/e2e tests
-├─ docs/core/              # overview, architecture, stack
-└─ scripts/                # dev/ops scripts
+├─ src/
+│  ├─ app.module.ts        # global wiring (interceptors, filters)
+│  ├─ main.ts              # bootstrap, /v1 prefix, notFound handler
+│  ├─ common/
+│  │  ├─ errors/           # ProblemException, ErrorCode
+│  │  ├─ http/
+│  │  │  ├─ decorators/    # SkipEnvelope
+│  │  │  ├─ filters/       # ProblemDetails filter
+│  │  │  └─ interceptors/  # envelope, request-id, idempotency
+│  │  └─ pagination/       # PageQueryDto, cursor, toPaginated
+│  ├─ auth/                # placeholder module
+│  ├─ health/              # GET /health (raw)
+│  ├─ prisma/              # Prisma service/module
+│  └─ redis/               # Redis service/module
+├─ prisma/                 # schema.prisma, migrations
+├─ test/                   # e2e tests
+├─ docs/
+│  ├─ core/                # overview, architecture, stack
+│  ├─ openapi/             # openapi.yaml (source of truth)
+│  ├─ standards/           # response standard
+│  └─ guide/               # developer guide (patterns & usage)
+├─ docker-compose.yml      # Postgres, Redis
+└─ package.json
 ```
 
 ## Build, Test, and Development Commands
@@ -34,7 +47,17 @@ biometric-core-backend/
 - Naming: `camelCase` vars/functions, `PascalCase` classes, `SCREAMING_SNAKE_CASE` constants.
 - Nest patterns: `feature.module.ts`, `feature.controller.ts`, `feature.service.ts`, DTOs end with `.dto.ts`.
 
-See also: API response standard in `docs/standards/response-standard.md`.
+See also: API response standard in `docs/standards/response-standard.md` and developer guide in `docs/guide/README.md`.
+
+## Response & Utilities (Must Follow)
+
+- Envelope: controllers return plain DTOs; interceptor wraps as `{ data, meta? }`.
+- Skip envelope: add `@SkipEnvelope()` for endpoints like `/health` or streams.
+- Errors: throw `ProblemException.*` with `ErrorCode` for RFC 7807 bodies.
+- Idempotency: POST/DELETE honor `Idempotency-Key`; replays return `Idempotency-Replayed: true`.
+- Pagination: accept `PageQueryDto` and return `toPaginated(items, nextCursor?, limit?)`; envelope adds `{ data, meta }`.
+- Versioning: all routes under `/v1` (except `/health`).
+- Spec: keep `docs/openapi/openapi.yaml` in sync; lint via `npm run spec:lint`.
 
 ## Testing Guidelines
 
