@@ -8,6 +8,13 @@ This repository contains the backend for the Biometric Core platform, built with
  - API Response Standard: docs/standards/response-standard.md
  - Developer Guide: docs/guide/README.md
 
+Feature Plans
+- Overview & priorities: docs/features/overview.md
+- Users module: docs/features/users.md
+- Auth (email/password): docs/features/auth-password.md
+- Enrollment (WebAuthn create): docs/features/enrollment.md
+- Auth (biometric assertion): docs/features/auth-biometric.md
+
 Development
 - Node.js 24 LTS is the project standard. Use `nvm use` (reads `.nvmrc`) to match the correct version.
 
