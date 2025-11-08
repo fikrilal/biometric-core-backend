@@ -51,6 +51,11 @@ This guide explains the core patterns used across the codebase so new features f
 - Lint: `npm run spec:lint` (Spectral).
 - Swagger UI is served at `/docs` from code-first decorators.
 
+## Auth Password Module
+- Specs: `docs/features/auth-password.md`.
+- Password hashing: Argon2id (see `auth-password/auth-password.service.ts`).
+- Token signing: `TokenService` (jose) issues access/refresh tokens.
+
 ## Data & Integrations
 - Prisma (Postgres): `src/prisma/*`, schema at `prisma/schema.prisma`.
 - Redis client: `src/redis/*` (lazy connect; `REDIS_URL` in `.env`).

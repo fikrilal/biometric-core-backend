@@ -490,3 +490,91 @@ paths:
           $ref: '#/components/responses/Problem'
       security:
         - bearerAuth: []
+  /v1/auth/password/register:
+    post:
+      tags: [Auth]
+      summary: Register with email/password
+      operationId: passwordRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, lastName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                firstName: { type: string }
+                lastName: { type: string }
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/login:
+    post:
+      tags: [Auth]
+      summary: Login with email/password
+      operationId: passwordLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate refresh token
+      operationId: passwordRefresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: New tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/logout:
+    post:
+      tags: [Auth]
+      summary: Logout/revoke refresh token
+      operationId: passwordLogout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200': { description: OK }
+        default:
+          $ref: '#/components/responses/Problem'

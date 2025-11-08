@@ -156,6 +156,7 @@ biometric-core-backend/
 - Threat modeling performed per feature (STRIDE/Kill Chain) with mitigations documented and tracked.
 - Regular security reviews, tabletop exercises, and disaster recovery drills with postmortem process feeding back into roadmap.
 - Response shape and error format are standardized; see `docs/standards/response-standard.md`.
+ - Auth modules reference `docs/features/auth-password.md` for password flows.
 
 ## Monorepo Structure (Folders Only)
 

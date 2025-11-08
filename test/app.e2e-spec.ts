@@ -97,4 +97,34 @@ describe('App e2e (health)', () => {
     expect(getRes.body.data.firstName).toBe(firstName);
     expect(getRes.body.data.lastName).toBe(lastName);
   });
+
+  it('password auth flow (register/login/refresh/logout)', async () => {
+    const server = (app as NestFastifyApplication).getHttpServer();
+    const email = `auth-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    const register = await request(server)
+      .post('/v1/auth/password/register')
+      .send({ email, password, firstName: 'Auth', lastName: 'User' })
+      .expect(201);
+    expect(register.body.data.accessToken).toBeDefined();
+    expect(register.body.data.refreshToken).toBeDefined();
+
+    const login = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password })
+      .expect(200);
+    expect(login.body.data.accessToken).toBeDefined();
+
+    const refresh = await request(server)
+      .post('/v1/auth/password/refresh')
+      .send({ refreshToken: login.body.data.refreshToken })
+      .expect(200);
+    expect(refresh.body.data.accessToken).toBeDefined();
+
+    await request(server)
+      .post('/v1/auth/password/logout')
+      .send({ refreshToken: login.body.data.refreshToken })
+      .expect(200);
+  });
 });

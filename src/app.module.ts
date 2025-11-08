@@ -11,6 +11,7 @@ import { ResponseEnvelopeInterceptor } from './common/http/interceptors/response
 import { RequestIdInterceptor } from './common/http/interceptors/request-id.interceptor';
 import { ProblemDetailsFilter } from './common/http/filters/problem-details.filter';
 import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.interceptor';
+import { AuthPasswordModule } from './auth-password/auth-password.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module';
     HealthModule,
     AuthModule,
     UsersModule,
+    AuthPasswordModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
