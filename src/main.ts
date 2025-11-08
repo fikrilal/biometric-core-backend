@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -35,17 +36,15 @@ async function bootstrap() {
   });
   const port = configService.get<number>('PORT', 3000);
   // Fastify notFound -> ProblemDetails
-  const fastify = app.getHttpAdapter().getInstance();
-  if (typeof fastify.setNotFoundHandler === 'function') {
-    fastify.setNotFoundHandler((req: any, reply: any) => {
-      const traceId = req?.headers?.['x-request-id'] || randomUUID();
-      reply
-        .header('X-Request-Id', traceId)
-        .header('Content-Type', 'application/problem+json')
-        .status(404)
-        .send({ type: 'about:blank', title: 'Not Found', status: 404, traceId });
-    });
-  }
+  const fastify = app.getHttpAdapter().getInstance() as FastifyInstance;
+  fastify.setNotFoundHandler((req: FastifyRequest, reply: FastifyReply) => {
+    const traceId = (req.headers['x-request-id'] as string | undefined) || randomUUID();
+    reply
+      .header('X-Request-Id', traceId)
+      .header('Content-Type', 'application/problem+json')
+      .status(404)
+      .send({ type: 'about:blank', title: 'Not Found', status: 404, traceId });
+  });
   await app.listen({ port, host: '0.0.0.0' });
 }
 

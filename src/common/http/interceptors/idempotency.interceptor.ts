@@ -1,27 +1,22 @@
-import {
-  CallHandler,
-  ConflictException,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
-import { Observable, of } from 'rxjs';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { createHash, randomUUID } from 'crypto';
 import { RedisService } from '../../../redis/redis.service';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ProblemException } from '../../errors/problem.exception';
 import { ErrorCode } from '../../errors/error-codes';
 
 interface CachedResponse {
   statusCode: number;
-  body: any;
+  body: unknown;
   headers?: {
     location?: string;
   };
 }
 
 @Injectable()
-export class IdempotencyInterceptor implements NestInterceptor {
+export class IdempotencyInterceptor implements NestInterceptor<unknown, unknown> {
   private readonly ttlSeconds = 24 * 60 * 60; // 24h
 
   constructor(private readonly redis: RedisService) {}
@@ -37,23 +32,23 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
   }
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const http = context.switchToHttp();
-    const req: any = http.getRequest();
-    const reply: any = http.getResponse();
+    const req = http.getRequest<FastifyRequest>();
+    const reply = http.getResponse<FastifyReply>();
 
     const method = (req?.method || '').toUpperCase();
     if (method !== 'POST' && method !== 'DELETE') {
       return next.handle();
     }
 
-    const keyHeader = req?.headers?.['idempotency-key'] as string | undefined;
+    const keyHeader = req.headers['idempotency-key'] as string | undefined;
     if (!keyHeader || typeof keyHeader !== 'string' || keyHeader.trim() === '') {
       return next.handle();
     }
 
     const hash = createHash('sha256').update(keyHeader).digest('hex');
-    const url = typeof req?.url === 'string' ? req.url : '';
+    const url = typeof req.url === 'string' ? req.url : '';
     const cacheKey = `idemp:${method}:${url}:${hash}`;
     const lockKey = `${cacheKey}:lock`;
 
@@ -62,11 +57,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
     // If cached, replay immediately
     const replayPromise = this.tryGetCached(cacheKey).then((cached) => {
       if (!cached) return null;
-      reply?.header?.('Idempotency-Replayed', 'true');
+      reply.header('Idempotency-Replayed', 'true');
       if (cached.headers?.location) {
-        reply?.header?.('Location', cached.headers.location);
+        reply.header('Location', cached.headers.location);
       }
-      reply?.status?.(cached.statusCode);
+      reply.status(cached.statusCode);
       return cached.body;
     });
 
@@ -80,19 +75,22 @@ export class IdempotencyInterceptor implements NestInterceptor {
         }
 
         // Acquire a short lock to prevent duplicate work
-        const lockRes = await (client as any).set(lockKey, randomUUID(), 'PX', 30000, 'NX');
-        if (lockRes !== 'OK') {
+        const acquired = await client.setnx(lockKey, randomUUID());
+        if (acquired) {
+          await client.pexpire(lockKey, 30000);
+        }
+        if (!acquired) {
           // Someone else is processing. Wait briefly for a cached result.
           const deadline = Date.now() + 2000; // 2s
-          let body: any = null;
+          let body: unknown = null;
           while (Date.now() < deadline) {
             const nowCached = await this.tryGetCached(cacheKey);
             if (nowCached) {
-              reply?.header?.('Idempotency-Replayed', 'true');
+              reply.header('Idempotency-Replayed', 'true');
               if (nowCached.headers?.location) {
-                reply?.header?.('Location', nowCached.headers.location);
+                reply.header('Location', nowCached.headers.location);
               }
-              reply?.status?.(nowCached.statusCode);
+              reply.status(nowCached.statusCode);
               body = nowCached.body;
               break;
             }
@@ -118,15 +116,19 @@ export class IdempotencyInterceptor implements NestInterceptor {
           .handle()
           .pipe(
             map((data) => {
-              const statusCode = reply?.statusCode ?? 200;
-              const location = reply?.getHeader?.('Location') as string | undefined;
+              const statusCode = reply.statusCode ?? 200;
+              const getHeader = (reply as unknown as { getHeader?: (key: string) => unknown }).getHeader;
+              const location =
+                typeof getHeader === 'function'
+                  ? (getHeader('Location') as string | undefined)
+                  : undefined;
               const payload: CachedResponse = {
                 statusCode,
                 body: data,
                 headers: location ? { location } : undefined,
               };
               // fire-and-forget cache store
-              (client as any)
+              client
                 .multi()
                 .set(cacheKey, JSON.stringify(payload), 'EX', this.ttlSeconds)
                 .del(lockKey)

@@ -33,6 +33,5 @@ export function validateEnv(config: Record<string, unknown>) {
   if (errors.length > 0) {
     throw new Error(errors.map((e) => JSON.stringify(e.constraints)).join(', '));
   }
-  return validated as Record<string, any>;
+  return validated as Record<string, unknown>;
 }
-

@@ -72,6 +72,13 @@ See also: API response standard in `docs/standards/response-standard.md` and dev
 - PRs: include what/why, linked issues, and update docs when behavior or APIs change.
 - Keep PRs focused and small; run lint/tests locally before opening.
 
+## Verification Checklist (Before Commit/PR)
+
+- Lint: `npm run lint` (fix issues before pushing)
+- Build: `npm run build` (ensure TypeScript compiles)
+- Tests: `npm run test:e2e` (and `npm run test` if unit tests exist)
+- Optional: OpenAPI spec lint `npm run spec:lint`
+
 ## Security & Configuration Tips
 
 - Never commit secrets. Use `.env` + `.env.example`; store real secrets in a secret manager.
