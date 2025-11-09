@@ -8,6 +8,10 @@ Biometric login requires an existing account. This module provides initial regis
 - POST `/v1/auth/login` — login with email + password → `{ accessToken, refreshToken, expiresIn }`
 - POST `/v1/auth/refresh` — rotate refresh token, return new tokens
 - POST `/v1/auth/logout` — revoke refresh token (optional if using stateless short-lived refresh via denylist)
+- POST `/v1/auth/verify/request` — send verification email (code/link)
+- POST `/v1/auth/verify/confirm` — confirm email with token/code
+- POST `/v1/auth/password/reset/request` — send password reset email
+- POST `/v1/auth/password/reset/confirm` — set new password using token
 
 ## Security & Tokens
 - Access token (JWT) short-lived (e.g., 15m);
@@ -32,11 +36,18 @@ Biometric login requires an existing account. This module provides initial regis
 ## Headers
 - `X-Request-Id` echoed; `Idempotency-Key` accepted for `/auth/register`.
 
+## Account Verification & Lifecycle
+- Verification tokens stored with expiry, one-time use; support both code (6 digits) and link (UUID) options.
+- Registration response indicates `emailVerified` flag (false until confirmed).
+- Password reset tokens stored separately; invalidated once used/reset.
+
 ## Acceptance Criteria
 - Registering same email returns 409.
 - Login returns access/refresh tokens; refresh rotates and invalidates prior token.
 - Logout revokes refresh token/family.
+- Verification tokens expire (e.g., 24h) and can be re-sent; verifying flips `emailVerified`.
+- Password reset flow requires valid token and enforces new password requirements.
 
 ## Test Plan
-- e2e: register → login → refresh → logout; invalid creds 401; re-register 409.
-- unit: password hashing/verification, token service.
+- e2e: register → login → refresh → logout; invalid creds 401; re-register 409; verify email; request/confirm password reset.
+- unit: password hashing/verification, token service, token generation/expiry logic.

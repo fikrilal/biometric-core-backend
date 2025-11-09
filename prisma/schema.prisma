@@ -13,8 +13,12 @@ model User {
   firstName String   @default("")
   lastName  String   @default("")
   passwordHash String?
+  emailVerified   Boolean  @default(false)
+  verificationRequestedAt DateTime?
   createdAt DateTime @default(now())
   refreshTokens RefreshToken[]
+  emailTokens EmailVerificationToken[]
+  resetTokens PasswordResetToken[]
 }
 
 model RefreshToken {
@@ -24,6 +28,32 @@ model RefreshToken {
   revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
   expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
