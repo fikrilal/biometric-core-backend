@@ -27,6 +27,7 @@ Biometric login requires an existing account. This module provides initial regis
 ## Validation
 - Register: email (RFC compliant), password strength policy (min length, complexity as needed).
 - Login: generic 401 for invalid credentials; do not leak which field failed.
+- Rate limiting: `/v1/auth/password/login` limited to 5 attempts per minute per (email + IP); `/v1/auth/password/refresh` limited to 20 per minute per (refresh token + IP). Exceeding the budget returns `429` with `code: RATE_LIMITED`.
 
 ## Errors
 - 400: invalid input (`code: VALIDATION_FAILED`)

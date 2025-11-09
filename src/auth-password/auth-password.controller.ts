@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Res } from '@nestjs/common';
+import { Body, Controller, Post, Res, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthPasswordService } from './auth-password.service';
 import { RegisterDto } from './dto/register.dto';
@@ -8,7 +8,7 @@ import { VerifyRequestDto } from './dto/verify-request.dto';
 import { VerifyConfirmDto } from './dto/verify-confirm.dto';
 import { ResetRequestDto } from './dto/reset-request.dto';
 import { ResetConfirmDto } from './dto/reset-confirm.dto';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 @ApiTags('auth-password')
 @Controller('auth/password')
@@ -25,14 +25,14 @@ export class AuthPasswordController {
 
   @Post('login')
   @ApiOperation({ summary: 'Login with email/password' })
-  login(@Body() dto: LoginDto) {
-    return this.service.login(dto);
+  login(@Body() dto: LoginDto, @Req() req: FastifyRequest) {
+    return this.service.login(dto, req.ip);
   }
 
   @Post('refresh')
   @ApiOperation({ summary: 'Rotate refresh token' })
-  refresh(@Body() dto: RefreshDto) {
-    return this.service.refresh(dto);
+  refresh(@Body() dto: RefreshDto, @Req() req: FastifyRequest) {
+    return this.service.refresh(dto, req.ip);
   }
 
   @Post('logout')

@@ -10,6 +10,7 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { PendingTokenService } from './tokens/pending-token.service';
 import { EmailService } from './email.service';
+import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service';
 import { AuthTokensResponse } from './dto/auth.response';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class AuthPasswordService {
     private readonly tokens: TokenService,
     private readonly pendingTokens: PendingTokenService,
     private readonly email: EmailService,
+    private readonly rateLimiter: RateLimiterService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -45,7 +47,12 @@ export class AuthPasswordService {
     return tokens;
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ip?: string) {
+    await this.rateLimiter.consume({
+      key: this.buildKey('login', dto.email, ip),
+      limit: 5,
+      ttlMs: 60 * 1000,
+    });
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user || !user.passwordHash || !(await argon2.verify(user.passwordHash, dto.password))) {
       throw new ProblemException(401, { title: 'Invalid credentials', code: ErrorCode.UNAUTHORIZED });
@@ -60,7 +67,12 @@ export class AuthPasswordService {
     return this.issueTokens(user);
   }
 
-  async refresh(dto: RefreshDto) {
+  async refresh(dto: RefreshDto, ip?: string) {
+    await this.rateLimiter.consume({
+      key: this.buildKey('refresh', dto.refreshToken, ip),
+      limit: 20,
+      ttlMs: 60 * 1000,
+    });
     const payload = await this.tokens.verifyRefreshToken(dto.refreshToken).catch(() => {
       throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
     });
@@ -158,5 +170,11 @@ export class AuthPasswordService {
       expiresIn: access.expiresIn,
       emailVerified: user.emailVerified,
     };
+  }
+
+  private buildKey(type: string, identifier: string, ip?: string) {
+    const normalizedId = identifier ?? 'unknown';
+    const normalizedIp = ip ?? 'unknown';
+    return `rl:${type}:${normalizedId}:${normalizedIp}`;
   }
 }

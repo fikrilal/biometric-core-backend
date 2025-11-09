@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TokenService } from './token.service';
 import { PendingTokenService } from './tokens/pending-token.service';
 import { MockEmailService, ResendEmailService, emailServiceProvider } from './email.service';
+import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
@@ -14,6 +15,7 @@ import { MockEmailService, ResendEmailService, emailServiceProvider } from './em
     AuthPasswordService,
     TokenService,
     PendingTokenService,
+    RateLimiterService,
     ResendEmailService,
     MockEmailService,
     emailServiceProvider,
