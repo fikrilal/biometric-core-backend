@@ -41,6 +41,11 @@ Biometric login requires an existing account. This module provides initial regis
 - Registration response indicates `emailVerified` flag (false until confirmed).
 - Password reset tokens stored separately; invalidated once used/reset.
 
+## Email Delivery
+- Local/dev flows use the in-memory `MockEmailService` (tokens logged to stdout and captured by tests).
+- Set `RESEND_API_KEY` + `EMAIL_FROM_ADDRESS` to enable the Resend API; optional `EMAIL_FROM_NAME`, `EMAIL_VERIFICATION_URL`, and `PASSWORD_RESET_URL` customize branding/links.
+- Verification/password-reset endpoints always send opaque tokens; when URLs are configured the service appends `?token=` automatically.
+
 ## Acceptance Criteria
 - Registering same email returns 409.
 - Login returns access/refresh tokens; refresh rotates and invalidates prior token.

@@ -29,6 +29,7 @@ Getting Started (Local)
   - `cp .env.example .env`
   - Defaults: Postgres `localhost:5432`, Redis `localhost:6380`
   - If your DB password contains special characters (e.g., `@`), URL‑encode it in `DATABASE_URL`.
+  - Optional email delivery: set `RESEND_API_KEY` + `EMAIL_FROM_ADDRESS` to send verification/reset emails via Resend. Leave unset to use the mock logger (tokens only printed to stdout).
 - 2) Start dependencies
   - `docker compose up -d`
   - Note: Redis is mapped to host port `6380`; Postgres to `5432`.

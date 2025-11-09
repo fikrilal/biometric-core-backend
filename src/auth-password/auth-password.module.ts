@@ -5,11 +5,18 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { TokenService } from './token.service';
 import { PendingTokenService } from './tokens/pending-token.service';
-import { MockEmailService } from './email.service';
+import { MockEmailService, ResendEmailService, emailServiceProvider } from './email.service';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
   controllers: [AuthPasswordController],
-  providers: [AuthPasswordService, TokenService, PendingTokenService, MockEmailService],
+  providers: [
+    AuthPasswordService,
+    TokenService,
+    PendingTokenService,
+    ResendEmailService,
+    MockEmailService,
+    emailServiceProvider,
+  ],
 })
 export class AuthPasswordModule {}

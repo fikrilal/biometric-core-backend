@@ -9,7 +9,7 @@ import { ErrorCode } from '../common/errors/error-codes';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { PendingTokenService } from './tokens/pending-token.service';
-import { MockEmailService } from './email.service';
+import { EmailService } from './email.service';
 import { AuthTokensResponse } from './dto/auth.response';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class AuthPasswordService {
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
     private readonly pendingTokens: PendingTokenService,
-    private readonly email: MockEmailService,
+    private readonly email: EmailService,
   ) {}
 
   async register(dto: RegisterDto) {

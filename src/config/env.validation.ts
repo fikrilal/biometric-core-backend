@@ -25,6 +25,26 @@ class EnvVars {
   @IsOptional()
   @IsString()
   LOG_LEVEL?: string;
+
+  @IsOptional()
+  @IsString()
+  RESEND_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_FROM_ADDRESS?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_FROM_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  EMAIL_VERIFICATION_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  PASSWORD_RESET_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvVars {
@@ -32,6 +52,9 @@ export function validateEnv(config: Record<string, unknown>): EnvVars {
   const errors = validateSync(validated, { skipMissingProperties: false });
   if (errors.length > 0) {
     throw new Error(errors.map((e) => JSON.stringify(e.constraints)).join(', '));
+  }
+  if (validated.RESEND_API_KEY && !validated.EMAIL_FROM_ADDRESS) {
+    throw new Error('EMAIL_FROM_ADDRESS is required when RESEND_API_KEY is set');
   }
   return validated;
 }

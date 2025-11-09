@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+export abstract class EmailService {
+  abstract sendVerification(email: string, token: string): Promise<void>;
+  abstract sendPasswordReset(email: string, token: string): Promise<void>;
+}
 
 @Injectable()
-export class MockEmailService {
+export class MockEmailService extends EmailService {
   private static verificationTokens = new Map<string, string[]>();
   private static resetTokens = new Map<string, string[]>();
 
   async sendVerification(email: string, token: string) {
     MockEmailService.storeToken(MockEmailService.verificationTokens, email, token);
-    // TODO: integrate real provider. For now, log for testing.
     console.log(`[email] verification token for ${email}: ${token}`);
   }
 
@@ -43,3 +48,129 @@ export class MockEmailService {
     return token;
   }
 }
+
+@Injectable()
+export class ResendEmailService extends EmailService {
+  private readonly logger = new Logger(ResendEmailService.name);
+  private readonly apiKey?: string;
+  private readonly fromAddress?: string;
+  private readonly fromName?: string;
+  private readonly verificationUrl?: string;
+  private readonly passwordResetUrl?: string;
+  private readonly baseUrl = 'https://api.resend.com';
+
+  constructor(private readonly config: ConfigService) {
+    super();
+    this.apiKey = this.config.get<string>('RESEND_API_KEY');
+    this.fromAddress = this.config.get<string>('EMAIL_FROM_ADDRESS');
+    this.fromName = this.config.get<string>('EMAIL_FROM_NAME');
+    this.verificationUrl = this.config.get<string>('EMAIL_VERIFICATION_URL');
+    this.passwordResetUrl = this.config.get<string>('PASSWORD_RESET_URL');
+  }
+
+  async sendVerification(email: string, token: string) {
+    const html = this.buildHtml({
+      heading: 'Verify your email address',
+      actionText: 'Verify Email',
+      token,
+      link: this.buildLink(this.verificationUrl, token),
+    });
+    await this.dispatchEmail({
+      to: email,
+      subject: 'Verify your email address',
+      html,
+      text: this.buildTextInstructions(token, this.verificationUrl),
+    });
+  }
+
+  async sendPasswordReset(email: string, token: string) {
+    const html = this.buildHtml({
+      heading: 'Reset your password',
+      actionText: 'Reset Password',
+      token,
+      link: this.buildLink(this.passwordResetUrl, token),
+    });
+    await this.dispatchEmail({
+      to: email,
+      subject: 'Password reset instructions',
+      html,
+      text: this.buildTextInstructions(token, this.passwordResetUrl),
+    });
+  }
+
+  private async dispatchEmail(input: { to: string; subject: string; html: string; text: string }) {
+    if (!this.apiKey || !this.fromAddress) {
+      this.logger.warn('RESEND_API_KEY or EMAIL_FROM_ADDRESS missing; email will not be sent.');
+      return;
+    }
+    const payload = {
+      from: this.formatFrom(),
+      to: [input.to],
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    };
+    const fetchFn = globalThis.fetch;
+    if (!fetchFn) {
+      throw new Error('Fetch API is not available in this runtime');
+    }
+    const response = await fetchFn(`${this.baseUrl}/emails`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      this.logger.error(`Failed to send email via Resend: ${response.status} ${errorBody}`);
+      throw new Error('Failed to send email via Resend');
+    }
+  }
+
+  private buildHtml(params: { heading: string; actionText: string; token: string; link?: string }) {
+    const action = params.link
+      ? `<p><a href="${params.link}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">${params.actionText}</a></p>`
+      : `<p>Use the token below to ${params.actionText.toLowerCase()}:</p>`;
+    return `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;">
+        <h2>${params.heading}</h2>
+        ${action}
+        <p style="font-size:18px;"><strong>${params.token}</strong></p>
+        <p>If you did not request this action, you can safely ignore this email.</p>
+      </div>
+    `;
+  }
+
+  private buildTextInstructions(token: string, link?: string) {
+    if (link) {
+      return `Follow this link to continue: ${link}\n\nToken: ${token}`;
+    }
+    return `Use this token to continue: ${token}`;
+  }
+
+  private buildLink(baseUrl: string | undefined, token: string) {
+    if (!baseUrl) return undefined;
+    try {
+      const url = new URL(baseUrl);
+      url.searchParams.set('token', token);
+      return url.toString();
+    } catch {
+      this.logger.warn(`Invalid URL configured for email link: ${baseUrl}`);
+      return undefined;
+    }
+  }
+
+  private formatFrom() {
+    return this.fromName ? `${this.fromName} <${this.fromAddress}>` : this.fromAddress!;
+  }
+}
+
+export const emailServiceProvider = {
+  provide: EmailService,
+  useFactory: (config: ConfigService, resend: ResendEmailService, mock: MockEmailService) => {
+    return config.get<string>('RESEND_API_KEY') ? resend : mock;
+  },
+  inject: [ConfigService, ResendEmailService, MockEmailService],
+};
