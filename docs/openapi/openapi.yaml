@@ -154,6 +154,14 @@ components:
         accessToken: { type: string }
         refreshToken: { type: string }
         expiresIn: { type: integer, format: int32, description: Expiration in seconds }
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, emailVerified]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, format: int32, description: Access token expiration in seconds }
+        emailVerified: { type: boolean, description: Whether the account email is verified }
 
     EnrollmentVerifyInput:
       type: object
@@ -214,6 +222,21 @@ components:
       required: [data]
       properties:
         data: { $ref: '#/components/schemas/AuthVerifyResponse' }
+    EnvelopeAuthTokens:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/AuthTokens' }
+    OperationResult:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+    EnvelopeOperationResult:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/OperationResult' }
 
     EnvelopeEnrollmentVerifyResponse:
       type: object
@@ -576,5 +599,94 @@ paths:
                 refreshToken: { type: string }
       responses:
         '200': { description: OK }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/verify/request:
+    post:
+      tags: [Auth]
+      summary: Send verification email
+      operationId: passwordVerifyRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/verify/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm email verification token
+      operationId: passwordVerifyConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/reset/request:
+    post:
+      tags: [Auth]
+      summary: Send password reset email
+      operationId: passwordResetRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm password reset
+      operationId: passwordResetConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
         default:
           $ref: '#/components/responses/Problem'

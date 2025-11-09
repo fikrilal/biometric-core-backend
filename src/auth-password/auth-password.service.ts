@@ -10,6 +10,7 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { PendingTokenService } from './tokens/pending-token.service';
 import { MockEmailService } from './email.service';
+import { AuthTokensResponse } from './dto/auth.response';
 
 @Injectable()
 export class AuthPasswordService {
@@ -32,9 +33,10 @@ export class AuthPasswordService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         passwordHash,
+        verificationRequestedAt: new Date(),
       },
     });
-    const tokens = await this.issueTokens(user.id);
+    const tokens = await this.issueTokens(user);
     const verificationToken = await this.pendingTokens.createEmailToken(
       user.id,
       24 * 60 * 60 * 1000,
@@ -48,7 +50,14 @@ export class AuthPasswordService {
     if (!user || !user.passwordHash || !(await argon2.verify(user.passwordHash, dto.password))) {
       throw new ProblemException(401, { title: 'Invalid credentials', code: ErrorCode.UNAUTHORIZED });
     }
-    return this.issueTokens(user.id);
+    if (!user.emailVerified) {
+      throw new ProblemException(403, {
+        title: 'Email not verified',
+        detail: 'Please verify your email before logging in.',
+        code: ErrorCode.EMAIL_NOT_VERIFIED,
+      });
+    }
+    return this.issueTokens(user);
   }
 
   async refresh(dto: RefreshDto) {
@@ -66,7 +75,18 @@ export class AuthPasswordService {
       throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
     }
     await this.prisma.refreshToken.update({ where: { id: tokenId }, data: { revoked: true } });
-    return this.issueTokens(userId);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
+    }
+    if (!user.emailVerified) {
+      throw new ProblemException(403, {
+        title: 'Email not verified',
+        detail: 'Please verify your email before refreshing tokens.',
+        code: ErrorCode.EMAIL_NOT_VERIFIED,
+      });
+    }
+    return this.issueTokens(user);
   }
 
   async logout(dto: RefreshDto) {
@@ -86,14 +106,15 @@ export class AuthPasswordService {
     return { success: true };
   }
 
-  async confirmVerification(email: string, token: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw ProblemException.notFound('User not found');
-    const ok = await this.pendingTokens.consumeEmailToken(user.id, token);
-    if (!ok) {
+  async confirmVerification(token: string) {
+    const userId = await this.pendingTokens.consumeEmailToken(token);
+    if (!userId) {
       throw new ProblemException(400, { title: 'Invalid or expired token', code: ErrorCode.VALIDATION_FAILED });
     }
-    await this.prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerified: true, verificationRequestedAt: null },
+    });
     return { success: true };
   }
 
@@ -105,28 +126,28 @@ export class AuthPasswordService {
     return { success: true };
   }
 
-  async confirmPasswordReset(email: string, token: string, newPassword: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw ProblemException.notFound('User not found');
-    const ok = await this.pendingTokens.consumeResetToken(user.id, token);
-    if (!ok) {
+  async confirmPasswordReset(token: string, newPassword: string) {
+    const userId = await this.pendingTokens.consumeResetToken(token);
+    if (!userId) {
       throw new ProblemException(400, { title: 'Invalid or expired token', code: ErrorCode.VALIDATION_FAILED });
     }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw ProblemException.notFound('User not found');
     const passwordHash = await argon2.hash(newPassword, { type: argon2.argon2id });
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
     await this.prisma.refreshToken.updateMany({ where: { userId: user.id }, data: { revoked: true } });
     return { success: true };
   }
 
-  private async issueTokens(userId: string) {
-    const access = await this.tokens.signAccessToken(userId);
+  private async issueTokens(user: { id: string; emailVerified: boolean }): Promise<AuthTokensResponse> {
+    const access = await this.tokens.signAccessToken(user.id);
     const refreshId = randomUUID();
-    const refresh = await this.tokens.signRefreshToken(userId, refreshId);
+    const refresh = await this.tokens.signRefreshToken(user.id, refreshId);
     const tokenHash = await argon2.hash(refresh.token, { type: argon2.argon2id });
     await this.prisma.refreshToken.create({
       data: {
         id: refreshId,
-        userId,
+        userId: user.id,
         tokenHash,
         expiresAt: new Date(Date.now() + refresh.expiresIn * 1000),
       },
@@ -135,6 +156,7 @@ export class AuthPasswordService {
       accessToken: access.token,
       refreshToken: refresh.token,
       expiresIn: access.expiresIn,
+      emailVerified: user.emailVerified,
     };
   }
 }

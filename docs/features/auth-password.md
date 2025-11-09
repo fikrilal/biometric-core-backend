@@ -9,9 +9,9 @@ Biometric login requires an existing account. This module provides initial regis
 - POST `/v1/auth/refresh` — rotate refresh token, return new tokens
 - POST `/v1/auth/logout` — revoke refresh token (optional if using stateless short-lived refresh via denylist)
 - POST `/v1/auth/verify/request` — send verification email (code/link)
-- POST `/v1/auth/verify/confirm` — confirm email with token/code
+- POST `/v1/auth/verify/confirm` — confirm email with opaque token (no additional identifiers)
 - POST `/v1/auth/password/reset/request` — send password reset email
-- POST `/v1/auth/password/reset/confirm` — set new password using token
+- POST `/v1/auth/password/reset/confirm` — set new password using the opaque token
 
 ## Security & Tokens
 - Access token (JWT) short-lived (e.g., 15m);
@@ -37,7 +37,7 @@ Biometric login requires an existing account. This module provides initial regis
 - `X-Request-Id` echoed; `Idempotency-Key` accepted for `/auth/register`.
 
 ## Account Verification & Lifecycle
-- Verification tokens stored with expiry, one-time use; support both code (6 digits) and link (UUID) options.
+- Verification tokens stored with expiry, one-time use; distributed as opaque tokens embedded in a link (no email parameter required).
 - Registration response indicates `emailVerified` flag (false until confirmed).
 - Password reset tokens stored separately; invalidated once used/reset.
 

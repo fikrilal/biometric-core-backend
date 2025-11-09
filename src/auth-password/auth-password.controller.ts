@@ -50,7 +50,7 @@ export class AuthPasswordController {
   @Post('verify/confirm')
   @ApiOperation({ summary: 'Confirm verification token' })
   verifyConfirm(@Body() dto: VerifyConfirmDto) {
-    return this.service.confirmVerification(dto.email, dto.token);
+    return this.service.confirmVerification(dto.token);
   }
 
   @Post('password/reset/request')
@@ -62,6 +62,6 @@ export class AuthPasswordController {
   @Post('password/reset/confirm')
   @ApiOperation({ summary: 'Confirm password reset' })
   resetConfirm(@Body() dto: ResetConfirmDto) {
-    return this.service.confirmPasswordReset(dto.email, dto.token, dto.newPassword);
+    return this.service.confirmPasswordReset(dto.token, dto.newPassword);
   }
 }

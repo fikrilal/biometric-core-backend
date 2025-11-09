@@ -9,4 +9,7 @@ export class AuthTokensResponse {
 
   @ApiProperty({ description: 'Access token TTL in seconds' })
   expiresIn!: number;
+
+  @ApiProperty({ description: 'Whether the user has verified their email' })
+  emailVerified!: boolean;
 }
