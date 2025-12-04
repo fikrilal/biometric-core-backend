@@ -22,6 +22,12 @@ class EnvVars {
   @IsString()
   REDIS_URL!: string;
 
+  @IsString()
+  AUTH_JWT_ACCESS_SECRET!: string;
+
+  @IsString()
+  AUTH_JWT_REFRESH_SECRET!: string;
+
   @IsOptional()
   @IsString()
   LOG_LEVEL?: string;

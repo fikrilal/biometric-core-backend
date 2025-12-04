@@ -53,13 +53,13 @@ export class AuthPasswordController {
     return this.service.confirmVerification(dto.token);
   }
 
-  @Post('password/reset/request')
+  @Post('reset/request')
   @ApiOperation({ summary: 'Send password reset email' })
   resetRequest(@Body() dto: ResetRequestDto) {
     return this.service.requestPasswordReset(dto.email);
   }
 
-  @Post('password/reset/confirm')
+  @Post('reset/confirm')
   @ApiOperation({ summary: 'Confirm password reset' })
   resetConfirm(@Body() dto: ResetConfirmDto) {
     return this.service.confirmPasswordReset(dto.token, dto.newPassword);

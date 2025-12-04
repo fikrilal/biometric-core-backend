@@ -24,14 +24,15 @@ export class AuthPasswordService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw ProblemException.conflict('Email already exists');
     }
     const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email,
         firstName: dto.firstName,
         lastName: dto.lastName,
         passwordHash,
@@ -43,17 +44,18 @@ export class AuthPasswordService {
       user.id,
       24 * 60 * 60 * 1000,
     );
-    await this.email.sendVerification(dto.email, verificationToken);
+    await this.email.sendVerification(email, verificationToken);
     return tokens;
   }
 
   async login(dto: LoginDto, ip?: string) {
+    const email = this.normalizeEmail(dto.email);
     await this.rateLimiter.consume({
-      key: this.buildKey('login', dto.email, ip),
+      key: this.buildKey('login', email, ip),
       limit: 5,
       ttlMs: 60 * 1000,
     });
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || !user.passwordHash || !(await argon2.verify(user.passwordHash, dto.password))) {
       throw new ProblemException(401, { title: 'Invalid credentials', code: ErrorCode.UNAUTHORIZED });
     }
@@ -109,7 +111,8 @@ export class AuthPasswordService {
     return { success: true };
   }
 
-  async requestVerification(email: string) {
+  async requestVerification(rawEmail: string) {
+    const email = this.normalizeEmail(rawEmail);
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return { success: true };
     const token = await this.pendingTokens.createEmailToken(user.id, 24 * 60 * 60 * 1000);
@@ -130,7 +133,8 @@ export class AuthPasswordService {
     return { success: true };
   }
 
-  async requestPasswordReset(email: string) {
+  async requestPasswordReset(rawEmail: string) {
+    const email = this.normalizeEmail(rawEmail);
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return { success: true };
     const token = await this.pendingTokens.createResetToken(user.id, 30 * 60 * 1000);
@@ -176,5 +180,9 @@ export class AuthPasswordService {
     const normalizedId = identifier ?? 'unknown';
     const normalizedIp = ip ?? 'unknown';
     return `rl:${type}:${normalizedId}:${normalizedIp}`;
+  }
+
+  private normalizeEmail(email: string) {
+    return email.trim().toLowerCase();
   }
 }
