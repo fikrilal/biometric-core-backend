@@ -19,6 +19,8 @@ model User {
   refreshTokens RefreshToken[]
   emailTokens EmailVerificationToken[]
   resetTokens PasswordResetToken[]
+  credentials Credential[]
+  devices     Device[]
 }
 
 model RefreshToken {
@@ -58,4 +60,40 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Credential {
+  id           String   @id @default(cuid())
+  userId       String
+  credentialId String   @unique
+  publicKey    Bytes
+  signCount    Int      @default(0)
+  aaguid       String?
+  transports   String?
+  deviceName   String?
+  revoked      Boolean  @default(false)
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  devices  Device[]
+
+  @@index([userId])
+}
+
+model Device {
+  id                String   @id @default(cuid())
+  userId            String
+  credentialId      String
+  label             String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  deactivatedAt     DateTime?
+  deactivatedReason String?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([credentialId])
 }

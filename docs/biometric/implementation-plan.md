@@ -18,12 +18,12 @@ This document outlines the implementation plan for adding WebAuthn‑based biome
 
 Files: `prisma/schema.prisma`.
 
-- [ ] Add `Credential` model:
-  - [ ] Fields:
+- [x] Add `Credential` model:
+  - [x] Fields:
     - `id String @id @default(cuid())`
     - `userId String`
     - `credentialId String` (unique per credential).
-    - `publicKey String` or `Bytes`.
+    - `publicKey Bytes`
     - `signCount Int @default(0)`
     - `aaguid String?`
     - `transports String?` (JSON or CSV string).
@@ -31,14 +31,14 @@ Files: `prisma/schema.prisma`.
     - `revoked Boolean @default(false)`
     - `revokedAt DateTime?`
     - `createdAt DateTime @default(now())`
-  - [ ] Relation:
+  - [x] Relation:
     - `user User @relation(fields: [userId], references: [id], onDelete: Cascade)`
-  - [ ] Indexes:
+  - [x] Indexes:
     - `@@unique([credentialId])`
     - `@@index([userId])`
 
-- [ ] Add `Device` model:
-  - [ ] Fields:
+- [x] Add `Device` model:
+  - [x] Fields:
     - `id String @id @default(cuid())`
     - `userId String`
     - `credentialId String`
@@ -47,10 +47,10 @@ Files: `prisma/schema.prisma`.
     - `createdAt DateTime @default(now())`
     - `deactivatedAt DateTime?`
     - `deactivatedReason String?`
-  - [ ] Relations:
+  - [x] Relations:
     - `user User @relation(fields: [userId], references: [id], onDelete: Cascade)`
     - `credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)`
-  - [ ] Indexes:
+  - [x] Indexes:
     - `@@index([userId])`
     - `@@index([credentialId])`
 
