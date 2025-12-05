@@ -117,11 +117,13 @@ export class IdempotencyInterceptor implements NestInterceptor<unknown, unknown>
           .pipe(
             map((data) => {
               const statusCode = reply.statusCode ?? 200;
-              const getHeader = (reply as unknown as { getHeader?: (key: string) => unknown }).getHeader;
-              const location =
-                typeof getHeader === 'function'
-                  ? (getHeader('Location') as string | undefined)
-                  : undefined;
+              let location: string | undefined;
+              try {
+                location = reply.getHeader('Location') as string | undefined;
+              } catch {
+                // getHeader may not be available in all contexts
+                location = undefined;
+              }
               const payload: CachedResponse = {
                 statusCode,
                 body: data,

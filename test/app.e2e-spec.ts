@@ -122,6 +122,14 @@ describe('App e2e (health)', () => {
     expect(register.body.data.accessToken).toBeDefined();
     expect(register.body.data.refreshToken).toBeDefined();
 
+    // Verify email before login (required by the system)
+    const verifyToken = MockEmailService.pullLatestVerificationToken(email);
+    expect(verifyToken).toBeDefined();
+    await request(server)
+      .post('/v1/auth/password/verify/confirm')
+      .send({ token: verifyToken })
+      .expect(200);
+
     const login = await request(server)
       .post('/v1/auth/password/login')
       .send({ email, password })

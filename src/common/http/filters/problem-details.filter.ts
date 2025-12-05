@@ -37,7 +37,6 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     }
 
     if (status >= 500) {
-      // eslint-disable-next-line no-console
       console.error('ProblemDetailsFilter exception', exception);
     }
 

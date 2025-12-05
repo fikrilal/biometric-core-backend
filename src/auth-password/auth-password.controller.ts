@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Res, Req } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Res, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthPasswordService } from './auth-password.service';
 import { RegisterDto } from './dto/register.dto';
@@ -24,42 +24,49 @@ export class AuthPasswordController {
   }
 
   @Post('login')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Login with email/password' })
   login(@Body() dto: LoginDto, @Req() req: FastifyRequest) {
     return this.service.login(dto, req.ip);
   }
 
   @Post('refresh')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Rotate refresh token' })
   refresh(@Body() dto: RefreshDto, @Req() req: FastifyRequest) {
     return this.service.refresh(dto, req.ip);
   }
 
   @Post('logout')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Revoke refresh token' })
   logout(@Body() dto: RefreshDto) {
     return this.service.logout(dto);
   }
 
   @Post('verify/request')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Send verification email' })
   verifyRequest(@Body() dto: VerifyRequestDto) {
     return this.service.requestVerification(dto.email);
   }
 
   @Post('verify/confirm')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Confirm verification token' })
   verifyConfirm(@Body() dto: VerifyConfirmDto) {
     return this.service.confirmVerification(dto.token);
   }
 
   @Post('reset/request')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Send password reset email' })
   resetRequest(@Body() dto: ResetRequestDto) {
     return this.service.requestPasswordReset(dto.email);
   }
 
   @Post('reset/confirm')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Confirm password reset' })
   resetConfirm(@Body() dto: ResetConfirmDto) {
     return this.service.confirmPasswordReset(dto.token, dto.newPassword);
