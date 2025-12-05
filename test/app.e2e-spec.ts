@@ -6,6 +6,7 @@ import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
 
 describe('App e2e (health)', () => {
+  console.log('TEST DATABASE_URL', process.env.DATABASE_URL);
   let app: INestApplication;
   const getServer = () => {
     const instance = (app as NestFastifyApplication).getHttpAdapter().getInstance();

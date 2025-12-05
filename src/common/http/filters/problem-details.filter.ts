@@ -36,6 +36,11 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       detail = exception.message;
     }
 
+    if (status >= 500) {
+      // eslint-disable-next-line no-console
+      console.error('ProblemDetailsFilter exception', exception);
+    }
+
     const problem: Record<string, unknown> = {
       type,
       title,

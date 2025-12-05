@@ -4,10 +4,10 @@ services:
     image: postgres:16
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - '5433:5432'
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: asalbaca
       POSTGRES_DB: biometric_core
     volumes:
       - pgdata:/var/lib/postgresql/data
