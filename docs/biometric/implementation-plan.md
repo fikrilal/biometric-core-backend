@@ -54,7 +54,7 @@ Files: `prisma/schema.prisma`.
     - `@@index([userId])`
     - `@@index([credentialId])`
 
-- [ ] Run `npx prisma migrate dev` and update `PrismaService` typings.
+- [x] Run `npx prisma migrate dev` and update `PrismaService` typings.
 
 ## Phase 2 – WebAuthn Service & Module
 
