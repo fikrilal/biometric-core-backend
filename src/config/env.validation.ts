@@ -7,6 +7,11 @@ export enum NodeEnv {
   Production = 'production',
 }
 
+export enum WebauthnSignCountMode {
+  Strict = 'strict',
+  Lenient = 'lenient',
+}
+
 class EnvVars {
   @IsEnum(NodeEnv)
   NODE_ENV!: NodeEnv;
@@ -51,6 +56,32 @@ class EnvVars {
   @IsOptional()
   @IsString()
   PASSWORD_RESET_URL?: string;
+
+  // WebAuthn / Biometric configuration
+
+  @IsOptional()
+  @IsString()
+  WEBAUTHN_RP_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  WEBAUTHN_RP_NAME?: string;
+
+  /**
+   * Comma-separated list of allowed origins for WebAuthn (e.g. https://app.example.com,https://localhost:3000).
+   */
+  @IsOptional()
+  @IsString()
+  WEBAUTHN_ORIGINS?: string;
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 180000))
+  @IsInt()
+  @Min(1000)
+  WEBAUTHN_CHALLENGE_TTL_MS: number = 180000;
+
+  @IsOptional()
+  @IsEnum(WebauthnSignCountMode)
+  WEBAUTHN_SIGNCOUNT_MODE: WebauthnSignCountMode = WebauthnSignCountMode.Strict;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvVars {
@@ -61,6 +92,14 @@ export function validateEnv(config: Record<string, unknown>): EnvVars {
   }
   if (validated.RESEND_API_KEY && !validated.EMAIL_FROM_ADDRESS) {
     throw new Error('EMAIL_FROM_ADDRESS is required when RESEND_API_KEY is set');
+  }
+  if (validated.NODE_ENV !== NodeEnv.Test) {
+    if (!validated.WEBAUTHN_RP_ID) {
+      throw new Error('WEBAUTHN_RP_ID is required when NODE_ENV is not "test"');
+    }
+    if (!validated.WEBAUTHN_ORIGINS) {
+      throw new Error('WEBAUTHN_ORIGINS is required when NODE_ENV is not "test"');
+    }
   }
   return validated;
 }

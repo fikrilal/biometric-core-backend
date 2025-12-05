@@ -4,15 +4,15 @@ This document outlines the implementation plan for adding WebAuthn‑based biome
 
 ## Phase 0 – Dependencies & Configuration
 
-- [ ] Add `@simplewebauthn/server` as a dependency.
-- [ ] Ensure Redis and Prisma are already configured (they are).
-- [ ] Extend env validation (`src/config/env.validation.ts`) with:
-  - [ ] `WEBAUTHN_RP_ID` (required in non‑test environments).
-  - [ ] `WEBAUTHN_RP_NAME` (optional, defaults to app name).
-  - [ ] `WEBAUTHN_ORIGINS` (comma‑separated list of allowed origins).
-  - [ ] `WEBAUTHN_CHALLENGE_TTL_MS` (optional; default 180000).
-  - [ ] `WEBAUTHN_SIGNCOUNT_MODE` (e.g., `strict` / `lenient` – optional).
-- [ ] Document these env vars in the main README and/or config docs.
+- [x] Add `@simplewebauthn/server` as a dependency.
+- [x] Ensure Redis and Prisma are already configured (they are).
+- [x] Extend env validation (`src/config/env.validation.ts`) with:
+  - [x] `WEBAUTHN_RP_ID` (required in non‑test environments).
+  - [x] `WEBAUTHN_RP_NAME` (optional, defaults to app name).
+  - [x] `WEBAUTHN_ORIGINS` (comma‑separated list of allowed origins).
+  - [x] `WEBAUTHN_CHALLENGE_TTL_MS` (optional; default 180000).
+  - [x] `WEBAUTHN_SIGNCOUNT_MODE` (e.g., `strict` / `lenient` – optional).
+- [x] Document these env vars in the main README and/or config docs.
 
 ## Phase 1 – Prisma Schema Changes
 
@@ -255,4 +255,3 @@ Files (proposed): `src/devices/devices.module.ts`, `src/devices/devices.controll
     - Biometric logins.
     - Step‑up requests.
     - Credential/device revocations.
-

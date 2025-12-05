@@ -30,6 +30,12 @@ Getting Started (Local)
   - Defaults: Postgres `localhost:5432`, Redis `localhost:6380`
   - If your DB password contains special characters (e.g., `@`), URL‑encode it in `DATABASE_URL`.
   - Optional email delivery: set `RESEND_API_KEY` + `EMAIL_FROM_ADDRESS` to send verification/reset emails via Resend. Leave unset to use the mock logger (tokens only printed to stdout).
+  - WebAuthn config (for biometric flows):
+    - `WEBAUTHN_RP_ID` – relying party ID (e.g., `localhost`, `app.example.com`); required in non‑test environments.
+    - `WEBAUTHN_RP_NAME` – human‑readable app name shown in browser prompts (optional).
+    - `WEBAUTHN_ORIGINS` – comma‑separated list of allowed origins (e.g., `https://localhost:3000,https://app.example.com`); required in non‑test environments.
+    - `WEBAUTHN_CHALLENGE_TTL_MS` – challenge lifetime in milliseconds (default `180000` / 3 minutes).
+    - `WEBAUTHN_SIGNCOUNT_MODE` – `strict` or `lenient` signCount handling (default `strict`).
 - 2) Start dependencies
   - `docker compose up -d`
   - Note: Redis is mapped to host port `6380`; Postgres to `5432`.
