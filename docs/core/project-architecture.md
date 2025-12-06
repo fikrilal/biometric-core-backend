@@ -10,7 +10,7 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
   - Kong or Envoy with mutual TLS, request signing, rate limiting, and threat detection.
   - Handles REST/OpenAPI traffic to downstream services.
 - **Identity Service**
-  - Manages user accounts, tenant isolation, and credential metadata.
+  - Manages user accounts and credential metadata.
   - Issues session tokens and short-lived challenge tokens bound to device assertions.
 - **Enrollment Service**
   - Orchestrates device registration, attestation validation, and policy compliance.
@@ -22,7 +22,7 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
   - Coordinates biometric confirmation for high-risk actions; generates cryptographic proofs of approval.
   - Supports out-of-band confirmations (push notifications, email) as fallbacks.
 - **Policy & Authorization**
-  - Centralizes tenant-specific rules, RBAC, and ABAC.
+  - Centralizes rules, RBAC, and ABAC.
   - Evaluates contextual signals (device trust, geolocation, transaction metadata) before granting access.
 - **Risk & Anomaly Service**
   - Collects telemetry, device reputation, and behavioral signals; produces risk scores and recommendations.
@@ -59,7 +59,7 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
 ## Security Architecture
 
 - Transport security – TLS on all external endpoints; optional mTLS at ingress or between components where required.
-- Key management – cloud KMS for signing/encryption keys; rotate regularly and segment by environment/tenant.
+- Key management – cloud KMS for signing/encryption keys; rotate regularly and segment by environment.
 - Secrets management – environment variables and cloud secret managers; avoid committing secrets.
 - Policy enforcement – implemented in-app via Nest guards and interceptors.
 - Data protection – pseudonymization for user identifiers, pgcrypto for sensitive fields, envelope encryption for stored artifacts when necessary.
@@ -68,7 +68,7 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
 ## Reliability & Scalability
 
 - Scale the Nest application horizontally; stateful components (Postgres, Redis) run in HA configurations.
-- Read replicas and partitioned tables support tenant isolation and high throughput.
+- Read replicas and partitioned tables support isolation and high throughput.
 - SLO-driven autoscaling triggered by custom metrics (challenge latency, queue backlogs).
 - Load testing validates failover characteristics and backpressure handling.
 
@@ -101,7 +101,7 @@ The platform exposes a unified API layer for biometric enrollment, authenticatio
   - BullMQ queues for heavy/async work (risk scoring, audit export, metadata sync).
   - Outbox pattern optional for reliable event publication if/when an event bus is introduced.
 - Security controls in-process
-  - Guards enforce tenant scoping and RBAC/ABAC policy checks.
+  - Guards enforce scoping and RBAC/ABAC policy checks.
   - Interceptors add request IDs, sanitize logs, and emit metrics/traces.
 - Testing strategy
   - Unit: providers with in-memory fakes or test doubles.

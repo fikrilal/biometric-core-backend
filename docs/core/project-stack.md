@@ -59,7 +59,7 @@
 - **Storybook/Docs** for componentized SDK samples and integration guides.
 - **Local dev environment** via Docker Compose or Tilt, including ephemeral dependencies (Postgres, Redis).
 - **ADR (Architecture Decision Records)** tracked alongside documentation to capture rationale over time.
-- **CLI tooling** (`oclif` or custom) to bootstrap tenants, rotate keys, and run diagnostic checks.
+- **CLI tooling** (`oclif` or custom) to rotate keys and run diagnostic checks.
 
 ## Third-Party Integrations (Optional)
 

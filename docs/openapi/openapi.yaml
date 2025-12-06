@@ -535,7 +535,7 @@ paths:
   /v1/devices:
     get:
       tags: [Devices]
-      summary: List devices for current user/tenant
+      summary: List devices for current user
       operationId: listDevices
       parameters:
         - $ref: '#/components/parameters/XRequestId'

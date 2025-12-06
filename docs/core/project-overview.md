@@ -26,7 +26,7 @@ Deliver an enterprise-grade biometric authentication platform that financial ins
 2. **Privacy & compliance** – store only derived biometric templates, apply strong encryption, and honor data minimization/deletion.
 3. **Developer ergonomics** – contract-first APIs, robust SDKs, and a modular codebase that scales with team size.
 4. **Operational excellence** – observable, resilient services with automated testing, release guardrails, and disaster recovery.
-5. **Extensibility** – configurable policies per tenant, pluggable risk engines, and support for emerging authenticators.
+5. **Extensibility** – configurable policies, pluggable risk engines, and support for emerging authenticators.
 
 ## Success Metrics
 
@@ -46,13 +46,13 @@ Deliver an enterprise-grade biometric authentication platform that financial ins
 ## Roadmap Phases (High Level)
 
 1. **Foundation** – core services skeleton, enrollment & authentication flows, WebAuthn integration, audit logging MVP.
-2. **Risk & Policy** – adaptive policy engine, anomaly detection pipelines, configurable tenant policies.
+2. **Risk & Policy** – adaptive policy engine, anomaly detection pipelines, configurable policies.
 3. **Enterprise Hardened** – SOC2 reporting, disaster recovery automation, admin portal, SLA enforcement.
 4. **Ecosystem** – SDKs (Mobile, Web), third-party integrator guides, marketplace for risk scoring plugins.
 
 ## Open Questions
 
-- Tenant deployment model: multi-tenant with logical isolation vs. dedicated clusters?
+- Deployment model: single logical environment vs. dedicated clusters?
 - Which cloud KMS provider(s) must be supported at launch?
 - Required compliance regimes per region (e.g., PSD2, FFIEC, MAS TRM) to calibrate controls.
 - Rollout strategy for legacy devices without native biometric support.

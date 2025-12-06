@@ -47,7 +47,7 @@ These must be handled via broader policies, risk scoring, and client‑side cont
        - Mark the credential as revoked (and optionally the associated device as inactive).
        - Log detailed context: userId, credentialId, storedSignCount, newSignCount, IP, user agent.
      - In **lenient** mode:
-       - At minimum, log the event with high severity and consider additional tenant‑specific rules.
+       - At minimum, log the event with high severity and consider additional rules.
 
 This policy is possible because email/password login remains available as a fallback, so revoking a credential does not lock the user out entirely.
 
@@ -79,11 +79,11 @@ This policy is possible because email/password login remains available as a fall
 
 When needed, integrate FIDO metadata and implement:
 
-- Allowlist/denylist of authenticators per tenant.
+- Allowlist/denylist of authenticators.
 - Minimum security requirements (e.g., platform authenticators only, hardware keys only).
-- Stronger policies for specific high‑risk tenants or regions.
+- Stronger policies for specific high‑risk environments or regions.
 
-These controls should be driven by configuration and/or tenant policies, not hard‑coded.
+These controls should be driven by configuration and/or policy settings, not hard‑coded.
 
 ## Challenges & Redis Storage
 
@@ -192,5 +192,4 @@ The following knobs should be exposed as configuration (env or config service), 
 - `WEBAUTHN_MAX_CREDENTIALS_PER_USER` – maximum active credentials/devices per user.
 - `STEP_UP_TOKEN_TTL_SECONDS` – step‑up token lifetime.
 
-These values may be adjusted per environment or tenant as the platform matures and gathers telemetry.
-
+- These values may be adjusted per environment as the platform matures and gathers telemetry.
