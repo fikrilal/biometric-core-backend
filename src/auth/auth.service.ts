@@ -11,6 +11,7 @@ import type { BiometricChallengeResponse } from './dto/biometric-challenge.respo
 import type { BiometricVerifyDto } from './dto/biometric-verify.dto';
 import type { AuthTokensResponse } from '../auth-password/dto/auth.response';
 import type {
+  AuthenticatorTransportFuture,
   PublicKeyCredentialRequestOptionsJSON,
   WebAuthnCredential,
 } from '@simplewebauthn/server/esm/types';
@@ -67,7 +68,7 @@ export class AuthService {
     if (!credentials.length) {
       throw new ProblemException(404, {
         title: 'No credentials for user',
-        code: ErrorCode.NOT_FOUND,
+        code: ErrorCode.NO_CREDENTIALS,
       });
     }
 
@@ -235,14 +236,26 @@ export class AuthService {
     return `webauthn:auth:challenge:${challengeId}`;
   }
 
-  private parseTransports(value: string | null | undefined) {
+  private parseTransports(
+    value: string | null | undefined,
+  ): AuthenticatorTransportFuture[] | undefined {
     if (!value) {
       return undefined;
     }
-    return value
+    const allowed: AuthenticatorTransportFuture[] = [
+      'ble',
+      'cable',
+      'hybrid',
+      'internal',
+      'nfc',
+      'smart-card',
+      'usb',
+    ];
+    const transports = value
       .split(',')
       .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+      .filter((t): t is AuthenticatorTransportFuture => allowed.includes(t as AuthenticatorTransportFuture));
+    return transports.length ? transports : undefined;
   }
 
   private normalizeEmail(email: string) {
@@ -284,7 +297,7 @@ export class AuthService {
     if (!credentials.length) {
       throw new ProblemException(404, {
         title: 'No credentials for user',
-        code: ErrorCode.NOT_FOUND,
+        code: ErrorCode.NO_CREDENTIALS,
       });
     }
 
@@ -322,7 +335,7 @@ export class AuthService {
     if (!raw) {
       throw new ProblemException(404, {
         title: 'Authentication challenge not found',
-        code: ErrorCode.NOT_FOUND,
+        code: ErrorCode.CHALLENGE_EXPIRED,
       });
     }
 
@@ -342,7 +355,7 @@ export class AuthService {
     if (Date.now() - state.createdAt > ttlMs) {
       throw new ProblemException(404, {
         title: 'Authentication challenge expired',
-        code: ErrorCode.NOT_FOUND,
+        code: ErrorCode.CHALLENGE_EXPIRED,
       });
     }
 

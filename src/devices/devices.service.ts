@@ -41,7 +41,7 @@ export class DevicesService {
     if (devices.length > take) {
       const next = devices.pop();
       if (next) {
-        nextCursor = encodeCursor<DeviceCursor>({
+        nextCursor = encodeCursor({
           id: next.id,
           createdAt: next.createdAt.toISOString(),
         });
@@ -86,4 +86,3 @@ export class DevicesService {
     });
   }
 }
-

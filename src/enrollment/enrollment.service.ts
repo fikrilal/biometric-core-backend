@@ -96,7 +96,7 @@ export class EnrollmentService {
     if (!raw) {
       throw new ProblemException(404, {
         title: 'Enrollment challenge not found',
-        code: ErrorCode.NOT_FOUND,
+        code: ErrorCode.CHALLENGE_EXPIRED,
       });
     }
 
@@ -116,7 +116,7 @@ export class EnrollmentService {
     if (Date.now() - state.createdAt > ttlMs) {
       throw new ProblemException(404, {
         title: 'Enrollment challenge expired',
-        code: ErrorCode.NOT_FOUND,
+        code: ErrorCode.CHALLENGE_EXPIRED,
       });
     }
 
@@ -206,4 +206,3 @@ export class EnrollmentService {
     return value.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
   }
 }
-
