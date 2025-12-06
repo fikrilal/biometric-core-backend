@@ -13,6 +13,8 @@ import { ProblemDetailsFilter } from './common/http/filters/problem-details.filt
 import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.interceptor';
 import { AuthPasswordModule } from './auth-password/auth-password.module';
 import { UsersModule } from './users/users.module';
+import { WebAuthnModule } from './webauthn/webauthn.module';
+import { EnrollmentModule } from './enrollment/enrollment.module';
 
 @Module({
   imports: [
@@ -26,9 +28,11 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     RedisModule,
     HealthModule,
+    WebAuthnModule,
     AuthModule,
     UsersModule,
     AuthPasswordModule,
+    EnrollmentModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },

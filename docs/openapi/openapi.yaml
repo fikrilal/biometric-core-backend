@@ -116,16 +116,15 @@ components:
       description: Identify the user to authenticate.
 
     EnrollmentChallengeInput:
-      oneOf:
-        - type: object
-          required: [email]
-          properties:
-            email: { type: string, format: email }
-        - type: object
-          required: [userId]
-          properties:
-            userId: { type: string }
-      description: Identify the user to enroll a device for.
+      type: object
+      description: >
+        Optional parameters for creating an enrollment challenge. The user to enroll is derived
+        from the authenticated access token; clients may provide an optional device label.
+      properties:
+        deviceName:
+          type: string
+          maxLength: 128
+          description: Optional human-friendly label for the device being enrolled.
 
     ChallengeResponse:
       type: object
@@ -349,6 +348,8 @@ paths:
               $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
 
   /v1/enroll/verify:
     post:

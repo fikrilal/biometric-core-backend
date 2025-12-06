@@ -99,40 +99,41 @@ Files (proposed): `src/auth-password/auth-tokens.service.ts`, `src/auth/jwt-auth
 
 Files (proposed): `src/enrollment/enrollment.module.ts`, `src/enrollment/enrollment.controller.ts`, `src/enrollment/enrollment.service.ts`, DTOs under `src/enrollment/dto`.
 
-- [ ] Create `EnrollmentModule`:
-  - [ ] Import `PrismaModule`, `RedisModule`, `WebAuthnModule`, `ConfigModule`, and `AuthModule` (if JWT guard used).
+- [x] Create `EnrollmentModule`:
+  - [x] Import `PrismaModule`, `RedisModule`, `WebAuthnModule`, and `AuthModule` for JWT guard.
 
-- [ ] Define DTOs:
-  - [ ] `EnrollChallengeDto` (request):
-    - Option A: `{ email?: string; userId?: string; deviceName?: string }`.
-    - Option B: empty, if using JWT and ignoring body identifiers.
-  - [ ] `EnrollChallengeResponse`:
-    - `{ challengeId: string; publicKeyCredentialOptions: any }`.
-  - [ ] `EnrollVerifyDto`:
-    - `{ challengeId: string; credential: WebAuthnAttestationDto }`.
-  - [ ] `EnrollVerifyResponse`:
+- [x] Define DTOs:
+  - [x] `EnrollChallengeDto` (request):
+    - `{ deviceName?: string }` (user derived from JWT).
+  - [x] `EnrollChallengeResponse`:
+    - `{ challengeId: string; publicKeyCredentialOptions: PublicKeyCredentialCreationOptionsJSON }`.
+  - [x] `EnrollVerifyDto`:
+    - `{ challengeId: string; credential: RegistrationResponseJSON }`.
+  - [x] `EnrollVerifyResponse`:
     - `{ credentialId: string; deviceId: string }`.
 
-- [ ] Implement `EnrollmentService`:
-  - [ ] `createChallenge(...)`:
+- [x] Implement `EnrollmentService`:
+  - [x] `createChallenge(userId, dto, ip?)`:
     - Resolve user.
+    - Enforce `emailVerified`.
     - Load existing credentials.
-    - Generate registration options.
-    - Store Redis challenge (context `"enroll"`).
-    - Apply rate limiting.
-  - [ ] `verifyEnrollment(...)`:
+    - Generate registration options via `WebAuthnService`.
+    - Store Redis challenge (context `"enroll"`) with TTL via `WebAuthnService.getChallengeTtlMs()`.
+    - Apply rate limiting via `RateLimiterService`.
+  - [x] `verifyEnrollment(dto)`:
     - Load and delete Redis challenge.
+    - Enforce TTL using stored `createdAt`.
     - Verify attestation via `WebAuthnService`.
-    - Create `Credential` and `Device`.
-    - Handle conflicts and idempotency.
+    - Upsert `Credential` and create `Device`.
+    - Handle conflicts when credential is already registered to a different user.
 
-- [ ] Implement `EnrollmentController`:
-  - [ ] `POST /v1/enroll/challenge`.
-  - [ ] `POST /v1/enroll/verify`.
-  - [ ] Annotate with Swagger decorators.
+- [x] Implement `EnrollmentController`:
+  - [x] `POST /v1/enroll/challenge` (guarded by `JwtAuthGuard`, user from `@CurrentUser()`).
+  - [x] `POST /v1/enroll/verify`.
+  - [x] Annotate with Swagger decorators.
 
-- [ ] Add module to `AppModule`.
-- [ ] Update OpenAPI spec to include enrollment endpoints and schemas.
+- [x] Add module to `AppModule`.
+- [x] Update OpenAPI spec to include enrollment endpoints and schemas.
 
 ## Phase 5 – Biometric Login Endpoints
 
