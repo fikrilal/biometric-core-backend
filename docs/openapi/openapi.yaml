@@ -275,7 +275,6 @@ paths:
       operationId: authCreateChallenge
       parameters:
         - $ref: '#/components/parameters/XRequestId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -290,10 +289,9 @@ paths:
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
-            Idempotency-Replayed:
-              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
+      security: []
 
   /v1/auth/verify:
     post:
@@ -302,7 +300,6 @@ paths:
       operationId: authVerify
       parameters:
         - $ref: '#/components/parameters/XRequestId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -313,12 +310,10 @@ paths:
           description: Authenticated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthVerifyResponse' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
-            Idempotency-Replayed:
-              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
 

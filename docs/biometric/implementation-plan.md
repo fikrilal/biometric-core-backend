@@ -139,37 +139,41 @@ Files (proposed): `src/enrollment/enrollment.module.ts`, `src/enrollment/enrollm
 
 Files: `src/auth/auth.module.ts`, `src/auth/auth.controller.ts`, `src/auth/auth.service.ts`, new DTOs under `src/auth/dto`.
 
-- [ ] Expand `AuthModule`:
-  - [ ] Import `PrismaModule`, `RedisModule`, `WebAuthnModule`, `ConfigModule`, and `AuthTokensService`.
-  - [ ] Export `JwtAuthGuard` and `AuthTokensService` if needed by other modules.
+- [x] Expand `AuthModule`:
+  - [x] Import `PrismaModule`, `RedisModule`, `WebAuthnModule`, and `AuthPasswordModule` (for `AuthTokensService`).
+  - [x] Export `JwtAuthGuard` for reuse by other modules.
 
-- [ ] Define DTOs:
-  - [ ] `BiometricChallengeDto`:
+- [x] Define DTOs:
+  - [x] `BiometricChallengeDto`:
     - `{ email?: string; userId?: string }`.
-  - [ ] `BiometricChallengeResponse`:
-    - `{ challengeId: string; publicKeyCredentialOptions: any }`.
-  - [ ] `BiometricVerifyDto`:
-    - `{ challengeId: string; credential: WebAuthnAssertionDto }`.
-  - [ ] `BiometricVerifyResponse`:
+  - [x] `BiometricChallengeResponse`:
+    - `{ challengeId: string; publicKeyCredentialOptions: PublicKeyCredentialRequestOptionsJSON }`.
+  - [x] `BiometricVerifyDto`:
+    - `{ challengeId: string; credential: AuthenticationResponseJSON }`.
+  - [x] `BiometricVerifyResponse`:
     - `AuthTokensResponse` (reuse existing DTO).
 
-- [ ] Implement `AuthService` methods:
-  - [ ] `createBiometricLoginChallenge(dto, ip)`:
-    - Resolve user.
+- [x] Implement `AuthService` methods:
+  - [x] `createBiometricLoginChallenge(dto, ip)`:
+    - Resolve user by email or userId.
+    - Require `emailVerified`.
     - Load active credentials/devices.
-    - Generate authentication options.
-    - Store Redis challenge (`context: "login"`).
-    - Apply rate limiting.
-  - [ ] `verifyBiometricLogin(dto, ip)`:
+    - Generate authentication options via `WebAuthnService`.
+    - Store Redis challenge (`context: "login"`) with TTL via `WebAuthnService.getChallengeTtlMs()`.
+    - Apply rate limiting via `RateLimiterService`.
+  - [x] `verifyBiometricLogin(dto)`:
     - Load and delete Redis challenge.
-    - Load credential/device and verify assertion.
-    - Apply signCount policy (revoking credential if compromised).
+    - Enforce TTL using stored `createdAt`.
+    - Reload user and ensure `emailVerified`.
+    - Load credential/device, verify association and active status.
+    - Verify assertion via `WebAuthnService`.
+    - Update `signCount` when the new counter is higher.
     - Issue tokens via `AuthTokensService`.
 
-- [ ] Implement controller endpoints:
-  - [ ] `POST /v1/auth/challenge`.
-  - [ ] `POST /v1/auth/verify`.
-  - [ ] Add Swagger annotations and align OpenAPI spec.
+- [x] Implement controller endpoints:
+  - [x] `POST /v1/auth/challenge`.
+  - [x] `POST /v1/auth/verify`.
+  - [x] Add Swagger annotations and align OpenAPI spec (use `AuthChallengeInput` and `AuthVerifyInput`, respond with `EnvelopeAuthTokens` on verify).
 
 ## Phase 6 – Step‑Up Tokens & Integration
 
