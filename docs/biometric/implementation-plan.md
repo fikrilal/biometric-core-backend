@@ -223,20 +223,19 @@ Files: `src/auth-password/token.service.ts`, `src/auth/auth.service.ts`, `src/au
 
 Files (proposed): `src/devices/devices.module.ts`, `src/devices/devices.controller.ts`, `src/devices/devices.service.ts`, DTOs under `src/devices/dto`.
 
-- [ ] Create `DevicesModule`:
-  - [ ] Import `PrismaModule` and `AuthModule`.
+- [x] Create `DevicesModule`:
+  - [x] Import `PrismaModule` and `AuthModule`.
 
-- [ ] Endpoints:
-  - [ ] `GET /v1/devices`:
-    - Requires JWT.
-    - Returns paginated list of devices for current user via `toPaginated(...)`.
-  - [ ] `DELETE /v1/devices/{id}`:
-    - Requires JWT.
-    - Optionally requires step‑up token for certain operations.
-    - Marks device as inactive and optionally revokes credential.
+- [x] Endpoints:
+  - [x] `GET /v1/devices`:
+    - [x] Requires JWT.
+    - [x] Returns paginated list of devices for current user via `toPaginated(...)`.
+  - [x] `DELETE /v1/devices/{id}`:
+    - [x] Requires JWT.
+    - [x] Marks device as inactive and revokes associated credential.
 
-- [ ] OpenAPI:
-  - [ ] Add schemas and responses for device listing and revocation.
+- [x] OpenAPI:
+  - [x] Use existing Device schemas and responses for device listing and revocation.
 
 ## Phase 8 – Error Codes, Testing, and Hardening
 
