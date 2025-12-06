@@ -6,6 +6,7 @@ import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
 import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
 import { WebauthnSignCountMode } from '../src/config/env.validation';
+import { TokenService } from '../src/auth-password/token.service';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -78,6 +79,7 @@ class FakeWebAuthnService {
 describe('App e2e (health)', () => {
   console.log('TEST DATABASE_URL', process.env.DATABASE_URL);
   let app: INestApplication;
+  let tokenService: TokenService;
   const getServer = () => {
     const instance = (app as NestFastifyApplication).getHttpAdapter().getInstance();
     return ((req, res) => {
@@ -113,6 +115,7 @@ describe('App e2e (health)', () => {
     );
     await app.init();
     await (app as NestFastifyApplication).getHttpAdapter().getInstance().ready();
+    tokenService = app.get(TokenService);
   });
 
   afterAll(async () => {
@@ -479,10 +482,11 @@ describe('App e2e (health)', () => {
     expect(enrollVerify.body.data.credentialId).toBeDefined();
 
     // Create step-up challenge (requires JWT)
+    const purpose = 'test_step_up';
     const stepUpChallenge = await request(server)
       .post('/v1/auth/step-up/challenge')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ purpose: 'test_step_up' })
+      .send({ purpose })
       .expect(200);
 
     const stepUpChallengeId = stepUpChallenge.body.data.challengeId as string;
@@ -514,5 +518,7 @@ describe('App e2e (health)', () => {
     const stepUpToken = stepUpVerify.body.data.stepUpToken as string;
     expect(typeof stepUpToken).toBe('string');
     expect(stepUpToken.length).toBeGreaterThan(0);
+    const decoded = await tokenService.verifyStepUpToken(stepUpToken);
+    expect(decoded.purpose).toBe(purpose);
   });
 });

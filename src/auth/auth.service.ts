@@ -24,11 +24,12 @@ import { TokenService } from '../auth-password/token.service';
 import { WebauthnSignCountMode } from '../config/env.validation';
 
 interface AuthChallengeState {
-  context: 'login';
+  context: 'login' | 'step_up';
   userId: string;
   email: string;
   options: PublicKeyCredentialRequestOptionsJSON;
   createdAt: number;
+  purpose?: string;
 }
 
 type CredentialRecord = {
@@ -317,11 +318,12 @@ export class AuthService {
 
     const challengeId = randomUUID();
     const state: AuthChallengeState = {
-      context: 'login',
+      context: 'step_up',
       userId: user.id,
       email: user.email,
       options,
       createdAt: Date.now(),
+      purpose: dto.purpose,
     };
 
     const ttlMs = this.webauthn.getChallengeTtlMs();
@@ -432,7 +434,7 @@ export class AuthService {
 
     await this.enforceSignCount(user.id, credentialRecord, verification.newSignCount, 'step_up');
 
-    const stepUp = await this.tokens.signStepUpToken(user.id, undefined, dto.challengeId);
+    const stepUp = await this.tokens.signStepUpToken(user.id, state.purpose, dto.challengeId);
     return { stepUpToken: stepUp.token };
   }
 
