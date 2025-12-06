@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
-import type { RegistrationResponseJSON } from '@simplewebauthn/server/esm/types';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server/esm/types';
 
-export class EnrollVerifyDto {
+export class StepUpVerifyDto {
   @ApiProperty()
   @IsString()
   challengeId!: string;
@@ -10,7 +10,7 @@ export class EnrollVerifyDto {
   @ApiProperty({
     type: 'object',
     additionalProperties: true,
-    description: 'WebAuthn attestation response from the client',
+    description: 'WebAuthn assertion response from the client',
   })
-  credential!: RegistrationResponseJSON;
+  credential!: AuthenticationResponseJSON;
 }

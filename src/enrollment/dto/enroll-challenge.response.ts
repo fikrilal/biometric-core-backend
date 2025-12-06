@@ -5,7 +5,10 @@ export class EnrollChallengeResponse {
   @ApiProperty()
   challengeId!: string;
 
-  @ApiProperty({ type: 'object' })
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description: 'WebAuthn registration options (opaque to the client)',
+  })
   publicKeyCredentialOptions!: PublicKeyCredentialCreationOptionsJSON;
 }
-

@@ -177,34 +177,40 @@ Files: `src/auth/auth.module.ts`, `src/auth/auth.controller.ts`, `src/auth/auth.
 
 ## Phase 6 – Step‑Up Tokens & Integration
 
-Files: `src/auth/token.service.ts`, `src/auth/auth.service.ts`, `src/auth/auth.controller.ts`, sensitive modules that will use step‑up.
+Files: `src/auth-password/token.service.ts`, `src/auth/auth.service.ts`, `src/auth/auth.controller.ts`, sensitive modules that will use step‑up.
 
-- [ ] Extend `TokenService`:
-  - [ ] Add `signStepUpToken(payload)` and `verifyStepUpToken(token)`.
-  - [ ] Define claims:
-    - `type: "step_up"`.
-    - `sub: userId`.
-    - `purpose: string`.
-    - `challengeId: string`.
-    - `iat`, `exp` (short lifetime).
+- [x] Extend `TokenService`:
+  - [x] Add `signStepUpToken(userId, purpose, challengeId)` and `verifyStepUpToken(token)`.
+  - [x] Define claims:
+    - [x] `type: "step_up"`.
+    - [x] `sub: userId`.
+    - [x] `purpose: string | undefined`.
+    - [x] `challengeId: string`.
+    - [x] `iat`, `exp` (short lifetime; default 120 seconds).
 
-- [ ] Add DTOs:
-  - [ ] `StepUpChallengeDto` (e.g., `{ purpose?: string }`).
-  - [ ] `StepUpChallengeResponse` (`{ challengeId, publicKeyCredentialOptions }`).
-  - [ ] `StepUpVerifyDto` (`{ challengeId, credential }`).
-  - [ ] `StepUpVerifyResponse` (`{ stepUpToken: string }`).
+- [x] Add DTOs:
+  - [x] `StepUpChallengeDto` (`{ purpose?: string }`).
+  - [x] `StepUpChallengeResponse` (`{ challengeId, publicKeyCredentialOptions }`).
+  - [x] `StepUpVerifyDto` (`{ challengeId, credential }`).
+  - [x] `StepUpVerifyResponse` (`{ stepUpToken: string }`).
 
-- [ ] Implement `AuthService` step‑up methods:
-  - [ ] `createStepUpChallenge(userId, purpose, ip)`:
-    - Requires JWT (access token).
-  - [ ] `verifyStepUp(userIdFromToken, dto, ip)`:
-    - Validates Redis challenge (`context: "step_up"`).
-    - Verifies assertion and signCount.
-    - Issues step‑up token with purpose and short TTL.
+- [x] Implement `AuthService` step‑up methods:
+  - [x] `createStepUpChallenge(userId, dto, ip)`:
+    - [x] Requires JWT (access token).
+    - [x] Resolves user and enforces `emailVerified`.
+    - [x] Loads active credentials/devices.
+    - [x] Generates authentication options via `WebAuthnService`.
+    - [x] Stores Redis challenge (reusing `context: "login"`) with TTL via `getChallengeTtlMs()`.
+    - [x] Applies rate limiting via `RateLimiterService`.
+  - [x] `verifyStepUp(userIdFromToken, dto)`:
+    - [x] Validates Redis challenge and TTL.
+    - [x] Ensures the challenge belongs to the same user.
+    - [x] Verifies assertion and updates signCount when appropriate.
+    - [x] Issues step‑up token via `TokenService.signStepUpToken`.
 
-- [ ] Implement controller endpoints:
-  - [ ] `POST /v1/auth/step-up/challenge` (guarded by `JwtAuthGuard`).
-  - [ ] `POST /v1/auth/step-up/verify` (guarded by `JwtAuthGuard`).
+- [x] Implement controller endpoints:
+  - [x] `POST /v1/auth/step-up/challenge` (guarded by `JwtAuthGuard`, user from `@CurrentUser()`).
+  - [x] `POST /v1/auth/step-up/verify` (guarded by `JwtAuthGuard`, user from `@CurrentUser()`).
 
 - [ ] Integrate step‑up into sensitive modules:
   - [ ] For each sensitive endpoint (e.g., `transactions`):

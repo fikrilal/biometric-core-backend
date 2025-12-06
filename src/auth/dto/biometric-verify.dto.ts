@@ -7,7 +7,10 @@ export class BiometricVerifyDto {
   @IsString()
   challengeId!: string;
 
-  @ApiProperty({ type: 'object' })
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description: 'WebAuthn assertion response from the client',
+  })
   credential!: AuthenticationResponseJSON;
 }
-

@@ -146,13 +146,30 @@ components:
           description: WebAuthn assertion response from the client.
           additionalProperties: true
 
-    AuthVerifyResponse:
+    StepUpChallengeInput:
       type: object
-      required: [accessToken, refreshToken, expiresIn]
+      description: Optional purpose for the step-up authentication.
       properties:
-        accessToken: { type: string }
-        refreshToken: { type: string }
-        expiresIn: { type: integer, format: int32, description: Expiration in seconds }
+        purpose:
+          type: string
+          maxLength: 128
+          description: Purpose for step-up (e.g., transaction:transfer).
+
+    StepUpVerifyInput:
+      type: object
+      required: [challengeId, credential]
+      properties:
+        challengeId: { type: string }
+        credential:
+          type: object
+          description: WebAuthn assertion response from the client.
+          additionalProperties: true
+
+    StepUpVerifyResponse:
+      type: object
+      required: [stepUpToken]
+      properties:
+        stepUpToken: { type: string }
     AuthTokens:
       type: object
       required: [accessToken, refreshToken, expiresIn, emailVerified]
@@ -220,7 +237,7 @@ components:
       type: object
       required: [data]
       properties:
-        data: { $ref: '#/components/schemas/AuthVerifyResponse' }
+        data: { $ref: '#/components/schemas/AuthTokens' }
     EnvelopeAuthTokens:
       type: object
       required: [data]
@@ -341,6 +358,62 @@ paths:
               $ref: '#/components/headers/XRequestId'
             Idempotency-Replayed:
               $ref: '#/components/headers/IdempotencyReplayed'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/auth/step-up/challenge:
+    post:
+      tags: [Auth]
+      summary: Create step-up authentication challenge
+      operationId: authStepUpCreateChallenge
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpChallengeInput' }
+      responses:
+        '200':
+          description: Challenge issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeChallengeResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/auth/step-up/verify:
+    post:
+      tags: [Auth]
+      summary: Verify step-up authentication and issue token
+      operationId: authStepUpVerify
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpVerifyInput' }
+      responses:
+        '200':
+          description: Step-up verified
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/StepUpVerifyResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
       security:
