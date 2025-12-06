@@ -60,39 +60,40 @@ Files: `prisma/schema.prisma`.
 
 Files (proposed): `src/webauthn/webauthn.module.ts`, `src/webauthn/webauthn.service.ts`.
 
-- [ ] Create `WebAuthnModule`:
-  - [ ] Import `ConfigModule` and `RedisModule`.
-  - [ ] Provide `WebAuthnService`.
+- [x] Create `WebAuthnModule`:
+  - [x] Import `ConfigModule` and `RedisModule`.
+  - [x] Provide `WebAuthnService`.
 
-- [ ] Implement `WebAuthnService`:
-  - [ ] Read RP configuration from env (`RP_ID`, `RP_NAME`, `ORIGINS`).
-  - [ ] Expose:
-    - `generateRegistrationOptions(user, existingCredentials)`:
+- [x] Implement `WebAuthnService`:
+  - [x] Read RP configuration from env (`RP_ID`, `RP_NAME`, `ORIGINS`).
+  - [x] Expose:
+    - `generateRegistrationOptionsForUser(user, existingCredentials)`:
       - Wraps `@simplewebauthn/server.generateRegistrationOptions`.
-    - `verifyRegistrationResponse({ expectedChallenge, expectedOrigin, expectedRPID, credential })`.
-    - `generateAuthenticationOptions(credentials)`:
+    - `verifyRegistration(response, expectedChallenge)`:
+      - Wraps `verifyRegistrationResponse`.
+    - `generateAuthenticationOptionsForUser(credentials)`:
       - Wraps `generateAuthenticationOptions`.
-    - `verifyAuthenticationResponse({ expectedChallenge, expectedOrigin, expectedRPID, credential, credentialPublicKey, credentialCurrentSignCount })`.
-  - [ ] Handle parsing/formatting of credential IDs (base64url vs Buffer).
-  - [ ] Respect configured challenge TTL and signCount mode where applicable.
+    - `verifyAuthentication(response, expectedChallenge, credential)`:
+      - Wraps `verifyAuthenticationResponse` and returns new signCount.
+  - [x] Handle parsing/formatting of credential IDs (base64url vs Buffer-compatible Uint8Array conversion for user IDs).
+  - [x] Respect configured challenge TTL and signCount mode where applicable (exposed via getters for use by higher-level services).
 
 ## Phase 3 – Shared Token Issuance & JWT Guard
 
-Files (proposed): `src/auth/auth-tokens.service.ts`, `src/auth/jwt.strategy.ts`, `src/auth/jwt-auth.guard.ts`, `src/auth/current-user.decorator.ts`.
+Files (proposed): `src/auth-password/auth-tokens.service.ts`, `src/auth/jwt-auth.guard.ts`, `src/auth/current-user.decorator.ts`.
 
-- [ ] Create `AuthTokensService`:
-  - [ ] Depends on `TokenService` and `PrismaService`.
-  - [ ] Expose `issueTokensForUser(userId: string): Promise<AuthTokensResponse>`.
-  - [ ] Internally:
-    - Loads user from Prisma.
-    - Enforces `emailVerified` before issuing tokens.
-    - Signs access and refresh tokens, storing hashed refresh tokens in DB (reusing pattern from `AuthPasswordService`).
-  - [ ] Refactor `AuthPasswordService` to use `AuthTokensService` instead of a private `issueTokens` helper.
+- [x] Create `AuthTokensService`:
+  - [x] Depends on `TokenService` and `PrismaService`.
+  - [x] Expose `issueTokensForUser(user: { id: string; emailVerified: boolean }): Promise<AuthTokensResponse>`.
+  - [x] Internally:
+    - [x] Signs access and refresh tokens using `TokenService`.
+    - [x] Stores hashed refresh tokens in DB via Prisma (reusing pattern from `AuthPasswordService`).
+  - [x] Refactor `AuthPasswordService` to use `AuthTokensService` instead of a private `issueTokens` helper.
 
-- [ ] Add `JwtStrategy` / `JwtAuthGuard`:
-  - [ ] Verify access tokens via `TokenService` (new `verifyAccessToken` method).
-  - [ ] Attach `userId` and optional metadata to the request.
-  - [ ] Provide `@CurrentUser()` decorator for controllers.
+- [x] Add `JwtAuthGuard` and `@CurrentUser` decorator:
+  - [x] Verify access tokens via `TokenService.verifyAccessToken`.
+  - [x] Attach `userId` and token payload to `FastifyRequest.user`.
+  - [x] Provide `@CurrentUser()` decorator for controllers to access the attached user.
 
 ## Phase 4 – Enrollment Module
 

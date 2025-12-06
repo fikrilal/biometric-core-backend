@@ -38,6 +38,11 @@ export class TokenService {
     return { token, expiresIn: this.refreshTtlSeconds };
   }
 
+  async verifyAccessToken(token: string) {
+    const result = await jwtVerify(token, this.accessSecret);
+    return result.payload;
+  }
+
   async verifyRefreshToken(token: string) {
     const result = await jwtVerify(token, this.refreshSecret);
     return result.payload;

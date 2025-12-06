@@ -7,17 +7,17 @@ import { TokenService } from './token.service';
 import { ProblemException } from '../common/errors/problem.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import * as argon2 from 'argon2';
-import { randomUUID } from 'crypto';
 import { PendingTokenService } from './tokens/pending-token.service';
 import { EmailService } from './email.service';
 import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service';
-import { AuthTokensResponse } from './dto/auth.response';
+import { AuthTokensService } from './auth-tokens.service';
 
 @Injectable()
 export class AuthPasswordService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
+    private readonly authTokens: AuthTokensService,
     private readonly pendingTokens: PendingTokenService,
     private readonly email: EmailService,
     private readonly rateLimiter: RateLimiterService,
@@ -39,7 +39,7 @@ export class AuthPasswordService {
         verificationRequestedAt: new Date(),
       },
     });
-    const tokens = await this.issueTokens(user);
+    const tokens = await this.authTokens.issueTokensForUser(user);
     const verificationToken = await this.pendingTokens.createEmailToken(
       user.id,
       24 * 60 * 60 * 1000,
@@ -66,7 +66,7 @@ export class AuthPasswordService {
         code: ErrorCode.EMAIL_NOT_VERIFIED,
       });
     }
-    return this.issueTokens(user);
+    return this.authTokens.issueTokensForUser(user);
   }
 
   async refresh(dto: RefreshDto, ip?: string) {
@@ -100,7 +100,7 @@ export class AuthPasswordService {
         code: ErrorCode.EMAIL_NOT_VERIFIED,
       });
     }
-    return this.issueTokens(user);
+    return this.authTokens.issueTokensForUser(user);
   }
 
   async logout(dto: RefreshDto) {
@@ -153,27 +153,6 @@ export class AuthPasswordService {
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
     await this.prisma.refreshToken.updateMany({ where: { userId: user.id }, data: { revoked: true } });
     return { success: true };
-  }
-
-  private async issueTokens(user: { id: string; emailVerified: boolean }): Promise<AuthTokensResponse> {
-    const access = await this.tokens.signAccessToken(user.id);
-    const refreshId = randomUUID();
-    const refresh = await this.tokens.signRefreshToken(user.id, refreshId);
-    const tokenHash = await argon2.hash(refresh.token, { type: argon2.argon2id });
-    await this.prisma.refreshToken.create({
-      data: {
-        id: refreshId,
-        userId: user.id,
-        tokenHash,
-        expiresAt: new Date(Date.now() + refresh.expiresIn * 1000),
-      },
-    });
-    return {
-      accessToken: access.token,
-      refreshToken: refresh.token,
-      expiresIn: access.expiresIn,
-      emailVerified: user.emailVerified,
-    };
   }
 
   private buildKey(type: string, identifier: string, ip?: string) {

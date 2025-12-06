@@ -7,12 +7,14 @@ import { TokenService } from './token.service';
 import { PendingTokenService } from './tokens/pending-token.service';
 import { MockEmailService, ResendEmailService, emailServiceProvider } from './email.service';
 import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service';
+import { AuthTokensService } from './auth-tokens.service';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
   controllers: [AuthPasswordController],
   providers: [
     AuthPasswordService,
+    AuthTokensService,
     TokenService,
     PendingTokenService,
     RateLimiterService,
@@ -20,5 +22,6 @@ import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service'
     MockEmailService,
     emailServiceProvider,
   ],
+  exports: [TokenService, AuthTokensService],
 })
 export class AuthPasswordModule {}
