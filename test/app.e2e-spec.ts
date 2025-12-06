@@ -4,6 +4,71 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import * as request from 'supertest';
 import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
+import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+  WebAuthnCredential,
+} from '@simplewebauthn/server/esm/types';
+
+class FakeWebAuthnService {
+  private readonly registrationChallenge = 'test-registration-challenge';
+  private readonly authenticationChallenge = 'test-auth-challenge';
+
+  getChallengeTtlMs(): number {
+    return 180000;
+  }
+
+  async generateRegistrationOptionsForUser(
+    user: WebAuthnUserDescriptor,
+    _existingCredentials: WebAuthnExistingCredential[],
+  ): Promise<PublicKeyCredentialCreationOptionsJSON> {
+    return {
+      rp: { id: 'localhost', name: 'Fake RP' },
+      user: { id: user.id, name: user.email, displayName: user.email },
+      challenge: this.registrationChallenge,
+      pubKeyCredParams: [],
+    };
+  }
+
+  async verifyRegistration(
+    response: RegistrationResponseJSON,
+    expectedChallenge: string,
+  ) {
+    // In tests we trust the wiring and ignore the actual challenge value.
+    // Always treat the response as a valid registration.
+    return {
+      credentialID: response.id,
+      credentialPublicKey: new Uint8Array([1, 2, 3]),
+      signCount: 0,
+      aaguid: 'test-aaguid',
+    };
+  }
+
+  async generateAuthenticationOptionsForUser(
+    _credentials: WebAuthnExistingCredential[],
+  ): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    return {
+      challenge: this.authenticationChallenge,
+    };
+  }
+
+  async verifyAuthentication(
+    response: AuthenticationResponseJSON,
+    expectedChallenge: string,
+    _credential: WebAuthnCredential,
+  ) {
+    if (expectedChallenge !== this.authenticationChallenge) {
+      return null;
+    }
+    return {
+      credentialID: response.id,
+      newSignCount: 1,
+    };
+  }
+}
 
 describe('App e2e (health)', () => {
   console.log('TEST DATABASE_URL', process.env.DATABASE_URL);
@@ -26,7 +91,10 @@ describe('App e2e (health)', () => {
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(WebAuthnService)
+      .useClass(FakeWebAuthnService)
+      .compile();
 
     app = await moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
       bufferLogs: true,
@@ -234,5 +302,212 @@ describe('App e2e (health)', () => {
       .expect(200);
 
     expect(loginNew.body.data.emailVerified).toBe(true);
+  });
+
+  it('supports enrollment and biometric login flow (happy path with fake WebAuthn)', async () => {
+    const server = getServer();
+    const email = `bio-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    // Register user
+    const register = await request(server)
+      .post('/v1/auth/password/register')
+      .send({ email, password, firstName: 'Bio', lastName: 'User' })
+      .expect(201);
+
+    // Verify email
+    const verifyToken = MockEmailService.pullLatestVerificationToken(email);
+    expect(verifyToken).toBeDefined();
+    await request(server)
+      .post('/v1/auth/password/verify/confirm')
+      .send({ token: verifyToken })
+      .expect(200);
+
+    // Login with password to get access token
+    const login = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password })
+      .expect(200);
+
+    const accessToken: string = login.body.data.accessToken;
+    expect(accessToken).toBeDefined();
+
+    // Create enrollment challenge (requires JWT)
+    const enrollChallenge = await request(server)
+      .post('/v1/enroll/challenge')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ deviceName: 'Test Device' })
+      .expect(200);
+
+    const enrollChallengeId = enrollChallenge.body.data.challengeId as string;
+    expect(enrollChallengeId).toBeDefined();
+
+    // Verify enrollment with fake WebAuthn response
+    const credentialId = `test-credential-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const fakeRegistration: RegistrationResponseJSON = {
+      id: credentialId,
+      rawId: credentialId,
+      type: 'public-key',
+      response: {
+        clientDataJSON: 'test-client-data',
+        attestationObject: 'test-attestation',
+        authenticatorData: undefined,
+        publicKeyAlgorithm: undefined,
+        publicKey: undefined,
+        transports: undefined,
+      },
+      clientExtensionResults: {},
+    };
+
+    const enrollVerify = await request(server)
+      .post('/v1/enroll/verify')
+      .send({
+        challengeId: enrollChallengeId,
+        credential: fakeRegistration,
+      })
+      .expect(200);
+
+    expect(enrollVerify.body.data.credentialId).toBeDefined();
+    expect(enrollVerify.body.data.deviceId).toBeDefined();
+
+    // Create biometric auth challenge
+    const authChallenge = await request(server)
+      .post('/v1/auth/challenge')
+      .send({ email })
+      .expect(200);
+
+    const authChallengeId = authChallenge.body.data.challengeId as string;
+    expect(authChallengeId).toBeDefined();
+
+    // Verify biometric auth with fake assertion
+    const fakeAssertion: AuthenticationResponseJSON = {
+      id: credentialId,
+      rawId: credentialId,
+      type: 'public-key',
+      response: {
+        clientDataJSON: 'test-client-data',
+        authenticatorData: 'test-auth-data',
+        signature: 'test-signature',
+        userHandle: undefined,
+      },
+      clientExtensionResults: {},
+    };
+
+    const authVerify = await request(server)
+      .post('/v1/auth/verify')
+      .send({
+        challengeId: authChallengeId,
+        credential: fakeAssertion,
+      })
+      .expect(200);
+
+    expect(authVerify.body.data.accessToken).toBeDefined();
+    expect(authVerify.body.data.refreshToken).toBeDefined();
+    expect(authVerify.body.data.emailVerified).toBe(true);
+  });
+
+  it('supports step-up biometric flow with fake WebAuthn', async () => {
+    const server = getServer();
+    const email = `stepup-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    // Register user
+    const register = await request(server)
+      .post('/v1/auth/password/register')
+      .send({ email, password, firstName: 'Step', lastName: 'Up' })
+      .expect(201);
+
+    expect(register.body.data.accessToken).toBeDefined();
+
+    // Verify email
+    const verifyToken = MockEmailService.pullLatestVerificationToken(email);
+    expect(verifyToken).toBeDefined();
+    await request(server)
+      .post('/v1/auth/password/verify/confirm')
+      .send({ token: verifyToken })
+      .expect(200);
+
+    // Login with password to get access token
+    const login = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password })
+      .expect(200);
+
+    const accessToken: string = login.body.data.accessToken;
+    expect(accessToken).toBeDefined();
+
+    // Enroll a device for the user
+    const enrollChallenge = await request(server)
+      .post('/v1/enroll/challenge')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ deviceName: 'Step-Up Device' })
+      .expect(200);
+
+    const enrollChallengeId = enrollChallenge.body.data.challengeId as string;
+    expect(enrollChallengeId).toBeDefined();
+
+    const credentialId = `stepup-credential-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const fakeRegistration: RegistrationResponseJSON = {
+      id: credentialId,
+      rawId: credentialId,
+      type: 'public-key',
+      response: {
+        clientDataJSON: 'test-client-data',
+        attestationObject: 'test-attestation',
+        authenticatorData: undefined,
+        publicKeyAlgorithm: undefined,
+        publicKey: undefined,
+        transports: undefined,
+      },
+      clientExtensionResults: {},
+    };
+
+    const enrollVerify = await request(server)
+      .post('/v1/enroll/verify')
+      .send({
+        challengeId: enrollChallengeId,
+        credential: fakeRegistration,
+      })
+      .expect(200);
+
+    expect(enrollVerify.body.data.deviceId).toBeDefined();
+    expect(enrollVerify.body.data.credentialId).toBeDefined();
+
+    // Create step-up challenge (requires JWT)
+    const stepUpChallenge = await request(server)
+      .post('/v1/auth/step-up/challenge')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ purpose: 'test_step_up' })
+      .expect(200);
+
+    const stepUpChallengeId = stepUpChallenge.body.data.challengeId as string;
+    expect(stepUpChallengeId).toBeDefined();
+
+    // Verify step-up with fake WebAuthn assertion
+    const fakeAssertion: AuthenticationResponseJSON = {
+      id: credentialId,
+      rawId: credentialId,
+      type: 'public-key',
+      response: {
+        clientDataJSON: 'test-client-data',
+        authenticatorData: 'test-auth-data',
+        signature: 'test-signature',
+        userHandle: undefined,
+      },
+      clientExtensionResults: {},
+    };
+
+    const stepUpVerify = await request(server)
+      .post('/v1/auth/step-up/verify')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        challengeId: stepUpChallengeId,
+        credential: fakeAssertion,
+      })
+      .expect(200);
+
+    const stepUpToken = stepUpVerify.body.data.stepUpToken as string;
+    expect(typeof stepUpToken).toBe('string');
+    expect(stepUpToken.length).toBeGreaterThan(0);
   });
 });

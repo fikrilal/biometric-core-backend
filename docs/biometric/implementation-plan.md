@@ -252,10 +252,12 @@ Files (proposed): `src/devices/devices.module.ts`, `src/devices/devices.controll
     - SignCount policy logic.
     - Step‑up token generation/verification.
   - [ ] E2E tests for:
-    - Enrollment happy path and expired challenge.
-    - Biometric login happy path and fallback to password.
-    - Step‑up happy path and expired/missing/invalid step‑up token.
-    - Revoked device behavior.
+    - [x] Enrollment + biometric login happy path (fake WebAuthn).
+    - [x] Step‑up happy path (fake WebAuthn).
+    - [ ] Enrollment expired challenge.
+    - [ ] Biometric login fallback to password.
+    - [ ] Step‑up expired/missing/invalid step‑up token.
+    - [ ] Revoked device behavior.
 
 - [ ] Logging & Observability:
   - [ ] Ensure logs include:

@@ -92,7 +92,7 @@ model Device {
   deactivatedReason String?
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  credential Credential @relation(fields: [credentialId], references: [credentialId], onDelete: Cascade)
 
   @@index([userId])
   @@index([credentialId])

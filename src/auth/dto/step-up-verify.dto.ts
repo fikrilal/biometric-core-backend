@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsObject, IsString } from 'class-validator';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/server/esm/types';
 
 export class StepUpVerifyDto {
@@ -12,5 +12,6 @@ export class StepUpVerifyDto {
     additionalProperties: true,
     description: 'WebAuthn assertion response from the client',
   })
+  @IsObject()
   credential!: AuthenticationResponseJSON;
 }

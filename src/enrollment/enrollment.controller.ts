@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { EnrollmentService } from './enrollment.service';
@@ -16,6 +16,7 @@ export class EnrollmentController {
 
   @Post('challenge')
   @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
   @ApiOperation({ summary: 'Create WebAuthn enrollment challenge' })
   async createChallenge(
     @CurrentUser() user: FastifyRequest['user'],
@@ -29,9 +30,9 @@ export class EnrollmentController {
   }
 
   @Post('verify')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Verify WebAuthn enrollment response' })
   async verify(@Body() dto: EnrollVerifyDto): Promise<EnrollVerifyResponse> {
     return this.enrollment.verifyEnrollment(dto);
   }
 }
-

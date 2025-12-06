@@ -9,7 +9,7 @@ import {
   type GenerateAuthenticationOptionsOpts,
   type VerifyRegistrationResponseOpts,
   type VerifyAuthenticationResponseOpts,
-} from '@simplewebauthn/server/esm';
+} from '@simplewebauthn/server';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -17,6 +17,8 @@ import type {
   AuthenticationResponseJSON,
   WebAuthnCredential,
   Base64URLString,
+  AuthenticatorTransportFuture,
+  Uint8Array_,
 } from '@simplewebauthn/server/esm/types';
 import { WebauthnSignCountMode } from '../config/env.validation';
 
@@ -33,7 +35,7 @@ export interface WebAuthnExistingCredential {
 
 export interface WebAuthnRegistrationResult {
   credentialID: Base64URLString;
-  credentialPublicKey: Uint8Array;
+  credentialPublicKey: Uint8Array_;
   signCount: number;
   aaguid: string;
 }
@@ -81,7 +83,7 @@ export class WebAuthnService {
   ): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const excludeCredentials = existingCredentials.map((cred) => ({
       id: cred.credentialId as Base64URLString,
-      transports: cred.transports ?? undefined,
+      transports: this.parseTransports(cred.transports),
     }));
 
     return generateRegistrationOptions({
@@ -113,11 +115,11 @@ export class WebAuthnService {
       return null;
     }
 
-    const { credential, aaguid, counter } = verification.registrationInfo;
+    const { credential, aaguid } = verification.registrationInfo;
     return {
       credentialID: credential.id,
       credentialPublicKey: credential.publicKey,
-      signCount: counter,
+      signCount: credential.counter,
       aaguid,
     };
   }
@@ -128,7 +130,7 @@ export class WebAuthnService {
   ): Promise<PublicKeyCredentialRequestOptionsJSON> {
     const allowCredentials = credentials.map((cred) => ({
       id: cred.credentialId as Base64URLString,
-      transports: cred.transports ?? undefined,
+      transports: this.parseTransports(cred.transports),
     }));
 
     return generateAuthenticationOptions({
@@ -166,9 +168,29 @@ export class WebAuthnService {
 
   /**
    * Convert a UTF-8 string to Uint8Array for userID.
-   */
-  private toUint8Array(value: string): Uint8Array {
-    return new TextEncoder().encode(value);
+  */
+  private toUint8Array(value: string): Uint8Array_ {
+    return new TextEncoder().encode(value) as Uint8Array_;
+  }
+
+  private parseTransports(
+    value: string[] | null | undefined,
+  ): AuthenticatorTransportFuture[] | undefined {
+    if (!value || !value.length) {
+      return undefined;
+    }
+    const allowed: AuthenticatorTransportFuture[] = [
+      'ble',
+      'cable',
+      'hybrid',
+      'internal',
+      'nfc',
+      'smart-card',
+      'usb',
+    ];
+    const transports = value.filter((t): t is AuthenticatorTransportFuture =>
+      allowed.includes(t as AuthenticatorTransportFuture),
+    );
+    return transports.length ? transports : undefined;
   }
 }
-
