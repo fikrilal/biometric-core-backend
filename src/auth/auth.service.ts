@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { WebAuthnService } from '../webauthn/webauthn.service';
@@ -21,6 +21,7 @@ import type { StepUpChallengeResponse } from './dto/step-up-challenge.response';
 import type { StepUpVerifyDto } from './dto/step-up-verify.dto';
 import type { StepUpVerifyResponse } from './dto/step-up-verify.response';
 import { TokenService } from '../auth-password/token.service';
+import { WebauthnSignCountMode } from '../config/env.validation';
 
 interface AuthChallengeState {
   context: 'login';
@@ -30,8 +31,20 @@ interface AuthChallengeState {
   createdAt: number;
 }
 
+type CredentialRecord = {
+  credentialId: string;
+  userId: string;
+  publicKey: Buffer;
+  signCount: number;
+  revoked: boolean;
+  transports: string | null;
+  devices: { id: string; active: boolean }[];
+};
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -151,7 +164,7 @@ export class AuthService {
         signCount: true,
         revoked: true,
         transports: true,
-        devices: { select: { active: true } },
+        devices: { select: { id: true, active: true } },
       },
     });
 
@@ -187,13 +200,7 @@ export class AuthService {
       });
     }
 
-    const newCounter = verification.newSignCount;
-    if (newCounter > credentialRecord.signCount) {
-      await this.prisma.credential.update({
-        where: { credentialId: credentialRecord.credentialId },
-        data: { signCount: newCounter },
-      });
-    }
+    await this.enforceSignCount(user.id, credentialRecord, verification.newSignCount, 'login');
 
     return this.authTokens.issueTokensForUser(user);
   }
@@ -387,7 +394,7 @@ export class AuthService {
         signCount: true,
         revoked: true,
         transports: true,
-        devices: { select: { active: true } },
+        devices: { select: { id: true, active: true } },
       },
     });
 
@@ -423,15 +430,79 @@ export class AuthService {
       });
     }
 
-    const newCounter = verification.newSignCount;
-    if (newCounter > credentialRecord.signCount) {
-      await this.prisma.credential.update({
-        where: { credentialId: credentialRecord.credentialId },
-        data: { signCount: newCounter },
-      });
-    }
+    await this.enforceSignCount(user.id, credentialRecord, verification.newSignCount, 'step_up');
 
     const stepUp = await this.tokens.signStepUpToken(user.id, undefined, dto.challengeId);
     return { stepUpToken: stepUp.token };
+  }
+
+  private async enforceSignCount(
+    userId: string,
+    credentialRecord: CredentialRecord,
+    newSignCount: number,
+    context: 'login' | 'step_up',
+  ) {
+    const stored = credentialRecord.signCount ?? 0;
+    const next = newSignCount ?? 0;
+    const mode = this.webauthn.getSignCountMode();
+
+    if (next === stored) {
+      return;
+    }
+
+    if (stored === 0 && next === 0) {
+      return;
+    }
+
+    if (next > stored) {
+      await this.prisma.credential.update({
+        where: { credentialId: credentialRecord.credentialId },
+        data: { signCount: next },
+      });
+      return;
+    }
+
+    this.logger.warn('WebAuthn signCount regression detected', {
+      userId,
+      credentialId: credentialRecord.credentialId,
+      context,
+      storedSignCount: stored,
+      reportedSignCount: next,
+      mode,
+    });
+
+    if (mode === WebauthnSignCountMode.Strict) {
+      await this.revokeCompromisedCredential(credentialRecord);
+      throw new ProblemException(401, {
+        title: 'Credential appears to be cloned or compromised',
+        detail:
+          'This biometric device can no longer be used. Please log in with your password and re-enroll a trusted device.',
+        code: ErrorCode.CREDENTIAL_COMPROMISED,
+      });
+    }
+  }
+
+  private async revokeCompromisedCredential(credentialRecord: CredentialRecord) {
+    const deviceIds = credentialRecord.devices.map((d) => d.id);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.credential.update({
+        where: { credentialId: credentialRecord.credentialId },
+        data: {
+          revoked: true,
+          revokedAt: new Date(),
+        },
+      });
+
+      if (deviceIds.length) {
+        await tx.device.updateMany({
+          where: { id: { in: deviceIds } },
+          data: {
+            active: false,
+            deactivatedAt: new Date(),
+            deactivatedReason: 'sign_count_regression',
+          },
+        });
+      }
+    });
   }
 }

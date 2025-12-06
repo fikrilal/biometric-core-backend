@@ -5,6 +5,7 @@ import * as request from 'supertest';
 import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
 import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
+import { WebauthnSignCountMode } from '../src/config/env.validation';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -19,6 +20,10 @@ class FakeWebAuthnService {
 
   getChallengeTtlMs(): number {
     return 180000;
+  }
+
+  getSignCountMode(): WebauthnSignCountMode {
+    return WebauthnSignCountMode.Strict;
   }
 
   async generateRegistrationOptionsForUser(
