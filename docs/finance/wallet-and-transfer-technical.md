@@ -299,7 +299,7 @@ TransactionsService should decide whether step‑up is required for a particular
 - Amount thresholds:
   - `amountMinor >= HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` → requires step‑up.
 - Daily usage:
-  - `dailyTotalSent + amountMinor` close to `TRANSFER_DAILY_LIMIT_MINOR` → requires step‑up.
+  - `dailyTotalSent + amountMinor >= 0.8 * TRANSFER_DAILY_LIMIT_MINOR` → requires step‑up (treat transfers that would consume 80%+ of the daily allowance as high risk).
 - Future criteria:
   - “First transfer to this recipient”.
   - Suspicious patterns surfaced by a risk engine.

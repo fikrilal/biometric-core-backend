@@ -173,7 +173,7 @@ This document breaks down the implementation work for the wallet and internal P2
     - [x] `dto/create-transfer.dto.ts` (request).
     - [x] `dto/transfer.response.ts` (response).
     - [x] `dto/resolve-recipient.dto.ts` (optional resolve endpoint).
-- [ ] Implement DTO validation
+- [x] Implement DTO validation
   - [x] `CreateTransferDto`:
     - [x] `recipient.userId?: string`.
     - [x] `recipient.email?: string`.
@@ -183,7 +183,7 @@ This document breaks down the implementation work for the wallet and internal P2
     - [x] `note?: string`.
     - [x] `clientReference?: string`.
     - [x] `stepUpToken?: string` (if using body instead of header).
-    - [ ] Custom validator to ensure exactly one of `recipient.userId` or `recipient.email` is provided.
+    - [x] Custom validator to ensure exactly one of `recipient.userId` or `recipient.email` is provided.
 - [x] Implement `TransactionsService`
   - [x] Helper: `resolveWalletForUser(userId: string)`:
     - [x] Delegates to `WalletsService.getOrCreateWalletForUser`.
@@ -261,52 +261,52 @@ This document breaks down the implementation work for the wallet and internal P2
 
 **Goal:** Enforce biometric step‑up for high‑risk transfers using existing step‑up tokens.
 
-- [ ] Decide on step‑up policy
-  - [ ] Choose thresholds and rules for when step‑up is required:
-    - [ ] Always for transfers ≥ `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR`.
-    - [ ] Optionally when daily total approaches `TRANSFER_DAILY_LIMIT_MINOR`.
-  - [ ] Document these rules in `docs/finance/wallet-and-transfer-product.md`.
-- [ ] Integrate with `TokenService` in `TransactionsService`
-  - [ ] Inject `TokenService` from `AuthPasswordModule`.
-  - [ ] Add helper `verifyStepUpToken(token: string, userId: string)`:
-    - [ ] Call `tokens.verifyStepUpToken`.
-    - [ ] Ensure:
-      - [ ] `type === 'step_up'`.
-      - [ ] `sub === userId`.
-      - [ ] `purpose` is `"transaction:transfer"` (or acceptable variant).
-    - [ ] Throw `ProblemException` with `UNAUTHORIZED`/`FORBIDDEN` on failure.
-  - [ ] Modify `createTransfer`:
-    - [ ] If `needsStepUp(...)` returns `true`:
-      - [ ] Require a valid step‑up token (from header/body).
-      - [ ] Call `verifyStepUpToken`.
-      - [ ] Set `stepUpUsed = true` on `WalletTransaction`.
-- [ ] Controller wiring
-  - [ ] Accept `X-Step-Up-Token` header (and optionally body field).
-  - [ ] Pass token to `TransactionsService` in a consistent way.
-- [ ] Update docs and OpenAPI
-  - [ ] Ensure `POST /v1/transactions/transfer` documents:
-    - [ ] When step‑up is required.
-    - [ ] How to supply `stepUpToken`.
+- [x] Decide on step‑up policy
+  - [x] Choose thresholds and rules for when step‑up is required:
+    - [x] Always for transfers ≥ `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR`.
+    - [x] Require when daily total approaches `TRANSFER_DAILY_LIMIT_MINOR` (currently ≥ 80% of the limit).
+  - [x] Document these rules in `docs/finance/wallet-and-transfer-product.md`.
+- [x] Integrate with `TokenService` in `TransactionsService`
+  - [x] Inject `TokenService` from `AuthPasswordModule`.
+  - [x] Add helper `verifyStepUpToken(token: string, userId: string)`:
+    - [x] Call `tokens.verifyStepUpToken`.
+    - [x] Ensure:
+      - [x] `type === 'step_up'`.
+      - [x] `sub === userId`.
+      - [x] `purpose` is `"transaction:transfer"` (or acceptable variant).
+    - [x] Throw `ProblemException` with `UNAUTHORIZED`/`FORBIDDEN` on failure.
+  - [x] Modify `createTransfer`:
+    - [x] If `needsStepUp(...)` returns `true`:
+      - [x] Require a valid step‑up token (from header/body).
+      - [x] Call `verifyStepUpToken`.
+      - [x] Set `stepUpUsed = true` on `WalletTransaction`.
+- [x] Controller wiring
+  - [x] Accept `X-Step-Up-Token` header (and optionally body field).
+  - [x] Pass token to `TransactionsService` in a consistent way.
+- [x] Update docs and OpenAPI
+  - [x] Ensure `POST /v1/transactions/transfer` documents:
+    - [x] When step‑up is required.
+    - [x] How to supply `stepUpToken`.
 
 ## Phase 5 – Testing (Unit + E2E)
 
 **Goal:** Ensure high coverage of happy paths, validation, error handling, idempotency, and step‑up behaviour.
 
-- [ ] Unit tests
-  - [ ] `wallets.service.spec.ts`:
-    - [ ] `getOrCreateWalletForUser` creates wallets for new users.
-    - [ ] `getWalletView` returns correct balances and limits.
-    - [ ] Daily usage calculation logic.
-  - [ ] `transactions.service.spec.ts`:
-    - [ ] Successful P2P transfer updates both wallets and ledger.
-    - [ ] Self‑transfer rejected (`SAME_WALLET_TRANSFER`).
-    - [ ] Insufficient funds rejected (`INSUFFICIENT_FUNDS`).
-    - [ ] Limits exceeded rejected (`LIMIT_EXCEEDED`).
-    - [ ] Idempotency with `clientReference` returns same transaction on retry.
-    - [ ] Conflicting `clientReference` produces conflict error.
-    - [ ] `needsStepUp` returns correct result for threshold boundaries.
-    - [ ] `verifyStepUpToken` enforces type, subject, purpose, and expiry.
-- [ ] E2E tests (extend `test/app.e2e-spec.ts` or add new file)
+- [x] Unit tests
+  - [x] `wallets.service.spec.ts`:
+    - [x] `getOrCreateWalletForUser` creates wallets for new users.
+    - [x] `getWalletView` returns correct balances and limits.
+    - [x] Daily usage calculation logic.
+  - [x] `transactions.service.spec.ts`:
+    - [x] Successful P2P transfer updates both wallets and ledger.
+    - [x] Self‑transfer rejected (`SAME_WALLET_TRANSFER`).
+    - [x] Insufficient funds rejected (`INSUFFICIENT_FUNDS`).
+    - [x] Limits exceeded rejected (`LIMIT_EXCEEDED`).
+    - [x] Idempotency with `clientReference` returns same transaction on retry.
+    - [x] Conflicting `clientReference` produces conflict error.
+    - [x] `needsStepUp` returns correct result for threshold boundaries.
+    - [x] `verifyStepUpToken` enforces type, subject, purpose, and expiry.
+- [x] E2E tests (extend `test/app.e2e-spec.ts` or add new file)
   - [x] Happy path:
     - [x] Register two users; verify both emails.
     - [x] Seed balance for sender (either via direct DB or placeholder top‑up helper).
@@ -316,20 +316,20 @@ This document breaks down the implementation work for the wallet and internal P2
         - [x] Sender balance decreased by amount.
         - [x] Recipient balance increased by amount.
         - [x] Transaction shows up in both histories with correct roles.
-  - [ ] Step‑up path:
-    - [ ] Use existing WebAuthn fake to obtain `stepUpToken`.
-    - [ ] Perform a high‑value transfer:
-      - [ ] Without token → expect 401/403.
-      - [ ] With valid token → expect success, `stepUpUsed = true`.
-  - [ ] Limits and errors:
-    - [ ] Attempt transfer above per‑transaction limit → `LIMIT_EXCEEDED`.
-    - [ ] Attempt transfer that exceeds daily limit → `LIMIT_EXCEEDED`.
-    - [ ] Attempt transfer with insufficient funds → `INSUFFICIENT_FUNDS`.
-    - [ ] Attempt transfer to non‑existent recipient → `RECIPIENT_NOT_FOUND`.
-  - [ ] Idempotency:
-    - [ ] Use same `Idempotency-Key` and `clientReference` for two requests:
-      - [ ] Ensure only one transfer is created.
-      - [ ] Second call returns same transaction and response.
+  - [x] Step‑up path:
+    - [x] Use existing WebAuthn fake to obtain `stepUpToken`.
+    - [x] Perform a high‑value transfer:
+      - [x] Without token → expect 401/403.
+      - [x] With valid token → expect success, `stepUpUsed = true`.
+  - [x] Limits and errors:
+    - [x] Attempt transfer above per‑transaction limit → `LIMIT_EXCEEDED`.
+    - [x] Attempt transfer that exceeds daily limit → `LIMIT_EXCEEDED`.
+    - [x] Attempt transfer with insufficient funds → `INSUFFICIENT_FUNDS`.
+    - [x] Attempt transfer to non‑existent recipient → `RECIPIENT_NOT_FOUND`.
+  - [x] Idempotency:
+    - [x] Use same `Idempotency-Key` and `clientReference` for two requests:
+      - [x] Ensure only one transfer is created.
+      - [x] Second call returns same transaction and response.
 
 ## Phase 6 – Observability & Hardening
 

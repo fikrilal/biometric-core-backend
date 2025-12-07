@@ -4,6 +4,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import * as request from 'supertest';
 import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
+import { ErrorCode } from '../src/common/errors/error-codes';
 import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
 import { WebauthnSignCountMode } from '../src/config/env.validation';
 import { TokenService } from '../src/auth-password/token.service';
@@ -17,6 +18,115 @@ import type {
 } from '@simplewebauthn/server/esm/types';
 
 const prisma = new PrismaClient();
+
+async function registerAndVerifyUser(
+  server: Parameters<typeof request>[0],
+  {
+    email,
+    password,
+    firstName,
+    lastName,
+  }: { email: string; password: string; firstName: string; lastName: string },
+) {
+  await request(server)
+    .post('/v1/auth/password/register')
+    .send({ email, password, firstName, lastName })
+    .expect(201);
+
+  const verifyToken = MockEmailService.pullLatestVerificationToken(email);
+  expect(verifyToken).toBeDefined();
+  await request(server)
+    .post('/v1/auth/password/verify/confirm')
+    .send({ token: verifyToken })
+    .expect(200);
+}
+
+async function loginUser(server: Parameters<typeof request>[0], email: string, password: string) {
+  const login = await request(server)
+    .post('/v1/auth/password/login')
+    .send({ email, password })
+    .expect(200);
+  return login.body.data.accessToken as string;
+}
+
+function buildFakeRegistration(credentialId: string): RegistrationResponseJSON {
+  return {
+    id: credentialId,
+    rawId: credentialId,
+    type: 'public-key',
+    response: {
+      clientDataJSON: 'test-client-data',
+      attestationObject: 'test-attestation',
+      authenticatorData: undefined,
+      publicKeyAlgorithm: undefined,
+      publicKey: undefined,
+      transports: undefined,
+    },
+    clientExtensionResults: {},
+  };
+}
+
+function buildFakeAssertion(credentialId: string): AuthenticationResponseJSON {
+  return {
+    id: credentialId,
+    rawId: credentialId,
+    type: 'public-key',
+    response: {
+      clientDataJSON: 'test-client-data',
+      authenticatorData: 'test-auth-data',
+      signature: 'test-signature',
+      userHandle: undefined,
+    },
+    clientExtensionResults: {},
+  };
+}
+
+async function enrollDevice(
+  server: Parameters<typeof request>[0],
+  accessToken: string,
+  credentialId: string,
+) {
+  const enrollChallenge = await request(server)
+    .post('/v1/enroll/challenge')
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({ deviceName: 'Test Device' })
+    .expect(200);
+
+  const challengeId = enrollChallenge.body.data.challengeId as string;
+  const fakeRegistration = buildFakeRegistration(credentialId);
+  await request(server)
+    .post('/v1/enroll/verify')
+    .send({
+      challengeId,
+      credential: fakeRegistration,
+    })
+    .expect(200);
+}
+
+async function obtainStepUpToken(
+  server: Parameters<typeof request>[0],
+  accessToken: string,
+  credentialId: string,
+) {
+  const stepUpChallenge = await request(server)
+    .post('/v1/auth/step-up/challenge')
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({ purpose: 'transaction:transfer' })
+    .expect(200);
+
+  const challengeId = stepUpChallenge.body.data.challengeId as string;
+  const fakeAssertion = buildFakeAssertion(credentialId);
+  const verify = await request(server)
+    .post('/v1/auth/step-up/verify')
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({
+      challengeId,
+      credential: fakeAssertion,
+    })
+    .expect(200);
+
+  return verify.body.data.stepUpToken as string;
+}
 
 class FakeWebAuthnService {
   private readonly registrationChallenge = 'test-registration-challenge';
@@ -647,5 +757,218 @@ describe('App e2e (health)', () => {
       .set('Authorization', `Bearer ${recipientToken}`)
       .expect(200);
     expect(recipientWalletAfter.body.data.availableBalanceMinor).toBe(100_000);
+  });
+
+  it('requires step-up token for high value transfers', async () => {
+    const server = getServer();
+    const password = 'Password123!';
+    const senderEmail = `hv-sender-${Date.now()}@example.com`;
+    const recipientEmail = `hv-recipient-${Date.now()}@example.com`;
+
+    await registerAndVerifyUser(server, {
+      email: senderEmail,
+      password,
+      firstName: 'HV Sender',
+      lastName: 'User',
+    });
+    await registerAndVerifyUser(server, {
+      email: recipientEmail,
+      password,
+      firstName: 'HV Recipient',
+      lastName: 'User',
+    });
+
+    const senderToken = await loginUser(server, senderEmail, password);
+    await loginUser(server, recipientEmail, password);
+
+    await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .expect(200);
+
+    const senderWallet = await prisma.wallet.findFirstOrThrow({
+      where: { user: { email: senderEmail.toLowerCase() } },
+    });
+    await prisma.wallet.update({
+      where: { id: senderWallet.id },
+      data: { availableBalanceMinor: 10_000_000 },
+    });
+
+    const basePayload = {
+      recipient: { email: recipientEmail },
+      amountMinor: 6_000_000,
+      currency: 'IDR',
+      clientReference: `hv-${Date.now()}`,
+      note: 'High value transfer',
+    };
+
+    const missingStepUp = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `hv-${Date.now()}`)
+      .send(basePayload)
+      .expect(401);
+    expect(missingStepUp.body.code).toBe(ErrorCode.UNAUTHORIZED);
+
+    const credentialId = `hv-cred-${Date.now()}`;
+    await enrollDevice(server, senderToken, credentialId);
+    const stepUpToken = await obtainStepUpToken(server, senderToken, credentialId);
+
+    const transfer = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `hv-${Date.now() + 1}`)
+      .set('X-Step-Up-Token', stepUpToken)
+      .send(basePayload)
+      .expect(201);
+
+    expect(transfer.body.data.stepUpUsed).toBe(true);
+    expect(transfer.body.data.amountMinor).toBe(6_000_000);
+  });
+
+  it('rejects transfers that violate funds, limits, or missing recipients', async () => {
+    const server = getServer();
+    const password = 'Password123!';
+    const senderEmail = `err-sender-${Date.now()}@example.com`;
+    const recipientEmail = `err-recipient-${Date.now()}@example.com`;
+
+    await registerAndVerifyUser(server, {
+      email: senderEmail,
+      password,
+      firstName: 'Error',
+      lastName: 'Sender',
+    });
+    await registerAndVerifyUser(server, {
+      email: recipientEmail,
+      password,
+      firstName: 'Error',
+      lastName: 'Recipient',
+    });
+
+    const senderToken = await loginUser(server, senderEmail, password);
+    await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .expect(200);
+
+    const senderWallet = await prisma.wallet.findFirstOrThrow({
+      where: { user: { email: senderEmail.toLowerCase() } },
+    });
+    await prisma.wallet.update({
+      where: { id: senderWallet.id },
+      data: { availableBalanceMinor: 50_000 },
+    });
+
+    const insufficient = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `err-${Date.now()}`)
+      .send({
+        recipient: { email: recipientEmail },
+        amountMinor: 100_000,
+        currency: 'IDR',
+        clientReference: `err-${Date.now()}`,
+      })
+      .expect(400);
+    expect(insufficient.body.code).toBe(ErrorCode.INSUFFICIENT_FUNDS);
+
+    await prisma.wallet.update({
+      where: { id: senderWallet.id },
+      data: { availableBalanceMinor: 500_000_000 },
+    });
+
+    const limit = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `err-${Date.now() + 1}`)
+      .send({
+        recipient: { email: recipientEmail },
+        amountMinor: 100_000_000,
+        currency: 'IDR',
+        clientReference: `err-limit-${Date.now()}`,
+      })
+      .expect(400);
+    expect(limit.body.code).toBe(ErrorCode.LIMIT_EXCEEDED);
+
+    const missingRecipient = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `err-${Date.now() + 2}`)
+      .send({
+        recipient: { email: 'missing-user@example.com' },
+        amountMinor: 10_000,
+        currency: 'IDR',
+        clientReference: `err-missing-${Date.now()}`,
+      })
+      .expect(404);
+    expect(missingRecipient.body.code).toBe(ErrorCode.RECIPIENT_NOT_FOUND);
+  });
+
+  it('reuses existing transfers when clientReference matches', async () => {
+    const server = getServer();
+    const password = 'Password123!';
+    const senderEmail = `idem-sender-${Date.now()}@example.com`;
+    const recipientEmail = `idem-recipient-${Date.now()}@example.com`;
+
+    await registerAndVerifyUser(server, {
+      email: senderEmail,
+      password,
+      firstName: 'Idem',
+      lastName: 'Sender',
+    });
+    await registerAndVerifyUser(server, {
+      email: recipientEmail,
+      password,
+      firstName: 'Idem',
+      lastName: 'Recipient',
+    });
+
+    const senderToken = await loginUser(server, senderEmail, password);
+    await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .expect(200);
+
+    const senderWallet = await prisma.wallet.findFirstOrThrow({
+      where: { user: { email: senderEmail.toLowerCase() } },
+    });
+    await prisma.wallet.update({
+      where: { id: senderWallet.id },
+      data: { availableBalanceMinor: 300_000 },
+    });
+
+    const clientReference = `idem-${Date.now()}`;
+    const transfer = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `idem-${Date.now()}`)
+      .send({
+        recipient: { email: recipientEmail },
+        amountMinor: 150_000,
+        currency: 'IDR',
+        clientReference,
+      })
+      .expect(201);
+
+    const replay = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `idem-${Date.now() + 1}`)
+      .send({
+        recipient: { email: recipientEmail },
+        amountMinor: 150_000,
+        currency: 'IDR',
+        clientReference,
+      })
+      .expect(201);
+
+    expect(replay.body.data.transactionId).toBe(transfer.body.data.transactionId);
+    expect(replay.body.data.clientReference).toBe(clientReference);
+
+    const walletAfter = await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .expect(200);
+    expect(walletAfter.body.data.availableBalanceMinor).toBe(150_000);
   });
 });

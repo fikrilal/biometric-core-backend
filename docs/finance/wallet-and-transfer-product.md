@@ -131,8 +131,8 @@ Planned but out of scope for this iteration:
 The platform already supports WebAuthn step‑up. For wallet transfers, we use it as follows:
 
 - **Always require step‑up** when:
-  - Transfer amount is above a configurable threshold (e.g., `HIGH_VALUE_TRANSFER_THRESHOLD`).
-  - Cumulative transfers for the day exceed a configurable limit (e.g., daily cap per user).
+  - Transfer amount is at or above `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR`.
+  - Outgoing transfers for the current UTC day (including the pending request) would exceed **80%** of `TRANSFER_DAILY_LIMIT_MINOR`. This gives us a buffer before hitting the hard limit while still treating “near daily cap” activity as high risk.
   - The recipient is considered “new” or “untrusted” (first time transfer; future enhancement).
 - **Optional step‑up** for:
   - Very small amounts (e.g., “coffee money”).
