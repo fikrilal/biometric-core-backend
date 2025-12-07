@@ -82,6 +82,28 @@ class EnvVars {
   @IsOptional()
   @IsEnum(WebauthnSignCountMode)
   WEBAUTHN_SIGNCOUNT_MODE: WebauthnSignCountMode = WebauthnSignCountMode.Strict;
+
+  // Wallet & transfer configuration
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 1000))
+  @IsInt()
+  @Min(1)
+  TRANSFER_MIN_AMOUNT_MINOR: number = 1000;
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 50_000_000))
+  @IsInt()
+  @Min(1)
+  TRANSFER_MAX_AMOUNT_MINOR: number = 50_000_000;
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 200_000_000))
+  @IsInt()
+  @Min(1)
+  TRANSFER_DAILY_LIMIT_MINOR: number = 200_000_000;
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 5_000_000))
+  @IsInt()
+  @Min(1)
+  HIGH_VALUE_TRANSFER_THRESHOLD_MINOR: number = 5_000_000;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvVars {

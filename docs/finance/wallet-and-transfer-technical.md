@@ -277,6 +277,9 @@ Suggested environment‑based configuration:
 - `TRANSFER_MIN_AMOUNT_MINOR` – minimum allowed transfer.
 - `TRANSFER_MAX_AMOUNT_MINOR` – per‑transaction maximum.
 - `TRANSFER_DAILY_LIMIT_MINOR` – maximum total amount a user can send per day.
+- `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` – transfers at/above this require biometric step‑up.
+
+These values are provided via environment variables (validated in `src/config/env.validation.ts`) and can use sensible defaults for local development. Production should tune them per policy.
 
 Implementation:
 

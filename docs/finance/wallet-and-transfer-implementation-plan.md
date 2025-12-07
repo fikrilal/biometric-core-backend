@@ -8,94 +8,94 @@ This document breaks down the implementation work for the wallet and internal P2
 
 **Goal:** Introduce Prisma models and enums for wallet, transactions, and ledger without breaking existing functionality.
 
-- [ ] Update Prisma schema
-  - [ ] Add enums in `prisma/schema.prisma`:
-    - [ ] `WalletStatus { ACTIVE, SUSPENDED, CLOSED }`.
-    - [ ] `WalletTransactionType { P2P_TRANSFER, ADJUSTMENT, PROMO_CREDIT }`.
-    - [ ] `WalletTransactionStatus { PENDING, COMPLETED, FAILED, REVERSED }`.
-    - [ ] `WalletLedgerDirection { DEBIT, CREDIT }`.
-  - [ ] Add `Wallet` model:
-    - [ ] Fields:
-      - [ ] `id String @id @default(cuid())`.
-      - [ ] `userId String @unique`.
-      - [ ] `currency String`.
-      - [ ] `status WalletStatus @default(ACTIVE)`.
-      - [ ] `availableBalanceMinor BigInt @default(0)`.
-      - [ ] `createdAt DateTime @default(now())`.
-      - [ ] `updatedAt DateTime @updatedAt`.
-    - [ ] Relations:
-      - [ ] `user User @relation(fields: [userId], references: [id], onDelete: Cascade)`.
-      - [ ] `outgoingTransactions WalletTransaction[] @relation("WalletOutgoing")`.
-      - [ ] `incomingTransactions WalletTransaction[] @relation("WalletIncoming")`.
-      - [ ] `ledgerEntries WalletLedgerEntry[]`.
-    - [ ] Indexes:
-      - [ ] `@@index([currency])`.
-  - [ ] Add `WalletTransaction` model:
-    - [ ] Fields:
-      - [ ] `id String @id @default(cuid())`.
-      - [ ] `type WalletTransactionType`.
-      - [ ] `status WalletTransactionStatus @default(COMPLETED)`.
-      - [ ] `fromWalletId String?`.
-      - [ ] `toWalletId String?`.
-      - [ ] `amountMinor BigInt`.
-      - [ ] `feeMinor BigInt @default(0)`.
-      - [ ] `currency String`.
-      - [ ] `note String?`.
-      - [ ] `clientReference String?`.
-      - [ ] `stepUpUsed Boolean @default(false)`.
-      - [ ] `createdAt DateTime @default(now())`.
-      - [ ] `completedAt DateTime?`.
-    - [ ] Relations:
-      - [ ] `fromWallet Wallet? @relation("WalletOutgoing", fields: [fromWalletId], references: [id])`.
-      - [ ] `toWallet Wallet? @relation("WalletIncoming", fields: [toWalletId], references: [id])`.
-      - [ ] `ledgerEntries WalletLedgerEntry[]`.
-    - [ ] Indexes:
-      - [ ] `@@index([fromWalletId, createdAt])`.
-      - [ ] `@@index([toWalletId, createdAt])`.
-      - [ ] `@@index([clientReference])`.
-  - [ ] Add `WalletLedgerEntry` model:
-    - [ ] Fields:
-      - [ ] `id String @id @default(cuid())`.
-      - [ ] `transactionId String`.
-      - [ ] `walletId String`.
-      - [ ] `direction WalletLedgerDirection`.
-      - [ ] `amountMinor BigInt`.
-      - [ ] `balanceAfterMinor BigInt`.
-      - [ ] `createdAt DateTime @default(now())`.
-    - [ ] Relations:
-      - [ ] `transaction WalletTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)`.
-      - [ ] `wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)`.
-    - [ ] Indexes:
-      - [ ] `@@index([walletId, createdAt, id])`.
-- [ ] Run Prisma migration
-  - [ ] `npx prisma migrate dev --name wallet_transfers_init`.
-  - [ ] `npx prisma generate`.
-  - [ ] Confirm generated client types for new models (no backfill needed because there are no existing users yet).
+- [x] Update Prisma schema
+  - [x] Add enums in `prisma/schema.prisma`:
+    - [x] `WalletStatus { ACTIVE, SUSPENDED, CLOSED }`.
+    - [x] `WalletTransactionType { P2P_TRANSFER, ADJUSTMENT, PROMO_CREDIT }`.
+    - [x] `WalletTransactionStatus { PENDING, COMPLETED, FAILED, REVERSED }`.
+    - [x] `WalletLedgerDirection { DEBIT, CREDIT }`.
+  - [x] Add `Wallet` model:
+    - [x] Fields:
+      - [x] `id String @id @default(cuid())`.
+      - [x] `userId String @unique`.
+      - [x] `currency String`.
+      - [x] `status WalletStatus @default(ACTIVE)`.
+      - [x] `availableBalanceMinor BigInt @default(0)`.
+      - [x] `createdAt DateTime @default(now())`.
+      - [x] `updatedAt DateTime @updatedAt`.
+    - [x] Relations:
+      - [x] `user User @relation(fields: [userId], references: [id], onDelete: Cascade)`.
+      - [x] `outgoingTransactions WalletTransaction[] @relation("WalletOutgoing")`.
+      - [x] `incomingTransactions WalletTransaction[] @relation("WalletIncoming")`.
+      - [x] `ledgerEntries WalletLedgerEntry[]`.
+    - [x] Indexes:
+      - [x] `@@index([currency])`.
+  - [x] Add `WalletTransaction` model:
+    - [x] Fields:
+      - [x] `id String @id @default(cuid())`.
+      - [x] `type WalletTransactionType`.
+      - [x] `status WalletTransactionStatus @default(COMPLETED)`.
+      - [x] `fromWalletId String?`.
+      - [x] `toWalletId String?`.
+      - [x] `amountMinor BigInt`.
+      - [x] `feeMinor BigInt @default(0)`.
+      - [x] `currency String`.
+      - [x] `note String?`.
+      - [x] `clientReference String?`.
+      - [x] `stepUpUsed Boolean @default(false)`.
+      - [x] `createdAt DateTime @default(now())`.
+      - [x] `completedAt DateTime?`.
+    - [x] Relations:
+      - [x] `fromWallet Wallet? @relation("WalletOutgoing", fields: [fromWalletId], references: [id])`.
+      - [x] `toWallet Wallet? @relation("WalletIncoming", fields: [toWalletId], references: [id])`.
+      - [x] `ledgerEntries WalletLedgerEntry[]`.
+    - [x] Indexes:
+      - [x] `@@index([fromWalletId, createdAt])`.
+      - [x] `@@index([toWalletId, createdAt])`.
+      - [x] `@@index([clientReference])`.
+  - [x] Add `WalletLedgerEntry` model:
+    - [x] Fields:
+      - [x] `id String @id @default(cuid())`.
+      - [x] `transactionId String`.
+      - [x] `walletId String`.
+      - [x] `direction WalletLedgerDirection`.
+      - [x] `amountMinor BigInt`.
+      - [x] `balanceAfterMinor BigInt`.
+      - [x] `createdAt DateTime @default(now())`.
+    - [x] Relations:
+      - [x] `transaction WalletTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)`.
+      - [x] `wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)`.
+    - [x] Indexes:
+      - [x] `@@index([walletId, createdAt, id])`.
+- [x] Run Prisma migration
+  - [x] `npx prisma migrate dev --name wallet_transfers_init`.
+  - [x] `npx prisma generate`.
+  - [x] Confirm generated client types for new models (no backfill needed because there are no existing users yet).
 
 ## Phase 1 – Configuration & Error Codes
 
 **Goal:** Introduce configuration keys and error codes needed for limits and transfer validation.
 
-- [ ] Extend environment validation in `src/config/env.validation.ts`
-  - [ ] Add optional numeric config values:
-    - [ ] `TRANSFER_MIN_AMOUNT_MINOR` (default a safe small value).
-    - [ ] `TRANSFER_MAX_AMOUNT_MINOR` (per‑transaction limit).
-    - [ ] `TRANSFER_DAILY_LIMIT_MINOR` (per‑day outgoing limit).
-    - [ ] `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` (amount that always requires step‑up).
-  - [ ] Ensure they:
-    - [ ] Parse as numbers (or strings representing integers).
-    - [ ] Have sensible defaults for local/dev environments.
-- [ ] Extend `ErrorCode` enum in `src/common/errors/error-codes.ts`
-  - [ ] Add:
-    - [ ] `INSUFFICIENT_FUNDS`.
-    - [ ] `LIMIT_EXCEEDED`.
-    - [ ] `WALLET_BLOCKED`.
-    - [ ] `RECIPIENT_NOT_FOUND`.
-    - [ ] `SAME_WALLET_TRANSFER`.
-  - [ ] Ensure no typos and codes are stable strings.
-- [ ] Document new configuration and error codes
-  - [ ] Update `docs/finance/wallet-and-transfer-technical.md` if needed.
-  - [ ] Optionally add a short section to the main `README.md` for new env keys.
+- [x] Extend environment validation in `src/config/env.validation.ts`
+  - [x] Add optional numeric config values:
+    - [x] `TRANSFER_MIN_AMOUNT_MINOR` (default a safe small value).
+    - [x] `TRANSFER_MAX_AMOUNT_MINOR` (per‑transaction limit).
+    - [x] `TRANSFER_DAILY_LIMIT_MINOR` (per‑day outgoing limit).
+    - [x] `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` (amount that always requires step‑up).
+  - [x] Ensure they:
+    - [x] Parse as numbers (or strings representing integers).
+    - [x] Have sensible defaults for local/dev environments.
+- [x] Extend `ErrorCode` enum in `src/common/errors/error-codes.ts`
+  - [x] Add:
+    - [x] `INSUFFICIENT_FUNDS`.
+    - [x] `LIMIT_EXCEEDED`.
+    - [x] `WALLET_BLOCKED`.
+    - [x] `RECIPIENT_NOT_FOUND`.
+    - [x] `SAME_WALLET_TRANSFER`.
+  - [x] Ensure no typos and codes are stable strings.
+- [x] Document new configuration and error codes
+  - [x] Update `docs/finance/wallet-and-transfer-technical.md` if needed.
+  - [ ] (Optional) Add a short section to the main `README.md` for new env keys.
 
 ## Phase 2 – WalletsModule (Balance & History)
 
