@@ -160,102 +160,102 @@ This document breaks down the implementation work for the wallet and internal P2
 
 **Goal:** Implement the core P2P transfer endpoints and transactional logic.
 
-- [ ] Create module skeleton under `src/transactions/`
-  - [ ] `transactions.module.ts`
-    - [ ] Import `PrismaModule`.
-    - [ ] Import `AuthModule`.
-    - [ ] Import `WalletsModule` if needed for shared logic (or call Prisma directly).
-    - [ ] Provide `TransactionsService`.
-    - [ ] Register `TransactionsController`.
-  - [ ] `transactions.service.ts`.
-  - [ ] `transactions.controller.ts`.
-  - [ ] DTOs:
-    - [ ] `dto/create-transfer.dto.ts` (request).
-    - [ ] `dto/transfer.response.ts` (response).
-    - [ ] `dto/resolve-recipient.dto.ts` (optional resolve endpoint).
+- [x] Create module skeleton under `src/transactions/`
+  - [x] `transactions.module.ts`
+    - [x] Import `PrismaModule`.
+    - [x] Import `AuthModule`.
+    - [x] Import `WalletsModule` if needed for shared logic (or call Prisma directly).
+    - [x] Provide `TransactionsService`.
+    - [x] Register `TransactionsController`.
+  - [x] `transactions.service.ts`.
+  - [x] `transactions.controller.ts`.
+  - [x] DTOs:
+    - [x] `dto/create-transfer.dto.ts` (request).
+    - [x] `dto/transfer.response.ts` (response).
+    - [x] `dto/resolve-recipient.dto.ts` (optional resolve endpoint).
 - [ ] Implement DTO validation
-  - [ ] `CreateTransferDto`:
-    - [ ] `recipient.userId?: string`.
-    - [ ] `recipient.email?: string`.
-    - [ ] `amountMinor: number` (or string) with validation:
-      - [ ] Positive integer.
-    - [ ] `currency: string`.
-    - [ ] `note?: string`.
-    - [ ] `clientReference?: string`.
-    - [ ] `stepUpToken?: string` (if using body instead of header).
+  - [x] `CreateTransferDto`:
+    - [x] `recipient.userId?: string`.
+    - [x] `recipient.email?: string`.
+    - [x] `amountMinor: number` (or string) with validation:
+      - [x] Positive integer.
+    - [x] `currency: string`.
+    - [x] `note?: string`.
+    - [x] `clientReference?: string`.
+    - [x] `stepUpToken?: string` (if using body instead of header).
     - [ ] Custom validator to ensure exactly one of `recipient.userId` or `recipient.email` is provided.
-- [ ] Implement `TransactionsService`
-  - [ ] Helper: `resolveWalletForUser(userId: string)`:
-    - [ ] Delegates to `WalletsService.getOrCreateWalletForUser`.
-  - [ ] Helper: `resolveRecipient(dtoRecipient)`:
-    - [ ] If `userId` provided:
-      - [ ] Fetch user by `id`.
-    - [ ] Else if `email` provided:
-      - [ ] Normalize email (trim + lowercase).
-      - [ ] Fetch user by `email`.
-    - [ ] If not found:
-      - [ ] Throw `ProblemException.notFound('Recipient not found')` with `RECIPIENT_NOT_FOUND`.
-  - [ ] Helper: `checkWalletStatuses(senderWallet, recipientWallet)`:
-    - [ ] Ensure sender `status === ACTIVE`.
-    - [ ] Ensure recipient `status !== CLOSED`.
-    - [ ] Throw `WALLET_BLOCKED` as appropriate.
-  - [ ] Helper: `checkCurrency(senderWallet, recipientWallet, dtoCurrency)`:
-    - [ ] Ensure all three currencies match; reject otherwise.
-  - [ ] Helper: `checkLimitsAndBalance(senderWallet, amountMinor, now)`:
-    - [ ] Compare `amountMinor` against `TRANSFER_MIN_AMOUNT_MINOR` and `TRANSFER_MAX_AMOUNT_MINOR`.
-    - [ ] Query outgoing transfers for current day and compute `dailyTotal`.
-    - [ ] Ensure `dailyTotal + amountMinor <= TRANSFER_DAILY_LIMIT_MINOR`.
-    - [ ] Ensure `senderWallet.availableBalanceMinor >= amountMinor`.
-    - [ ] Throw `LIMIT_EXCEEDED` or `INSUFFICIENT_FUNDS` as needed.
-  - [ ] Helper: `needsStepUp(amountMinor, dailyTotal)`:
-    - [ ] Evaluate against `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` and other criteria.
-  - [ ] `createTransfer(senderUserId, dto, stepUpPayload?)`:
-    - [ ] Resolve sender user and recipient user.
-    - [ ] Resolve sender/recipient wallets.
-    - [ ] Check `senderUserId !== recipientUser.id` (throw `SAME_WALLET_TRANSFER` if violated).
-    - [ ] Check wallet statuses and currency.
-    - [ ] Pre‑compute amount and `now`.
-    - [ ] Check idempotency using `clientReference`:
-      - [ ] If provided, look up existing transaction for `(fromWalletId, clientReference)`.
-      - [ ] If found:
-        - [ ] If recipient/amount/currency match, return existing transaction.
-        - [ ] Otherwise throw `409 Conflict`.
-    - [ ] Compute `dailyTotal` for outgoing transfers.
-    - [ ] Decide whether step‑up is required via `needsStepUp`.
-    - [ ] If step‑up required:
-      - [ ] Validate `stepUpPayload` (see Phase 4) or require `stepUpToken` from caller.
-    - [ ] Execute Prisma `$transaction`:
-      - [ ] Reload sender and recipient wallets inside the transaction.
-      - [ ] Re‑validate balance and limits with up‑to‑date values.
-      - [ ] Compute new balances.
-      - [ ] Create `WalletTransaction` record.
-      - [ ] Create corresponding `WalletLedgerEntry` rows for sender (`DEBIT`) and recipient (`CREDIT`).
-      - [ ] Update `Wallet.availableBalanceMinor` for both wallets to match computed balances.
-    - [ ] Return a DTO mapped from the created `WalletTransaction`.
-  - [ ] `getTransactionForUser(userId, transactionId)`:
-    - [ ] Resolve wallet for `userId`.
-    - [ ] Find `WalletTransaction` where:
-      - [ ] `id = transactionId` AND
-      - [ ] `fromWalletId = wallet.id OR toWalletId = wallet.id`.
-    - [ ] If not found → `404 Not Found`.
-    - [ ] Determine role: `SENDER` or `RECIPIENT`.
-    - [ ] Map to `TransferResponseDto`.
-- [ ] Implement `TransactionsController`
-  - [ ] Apply `@UseGuards(JwtAuthGuard)` at controller level.
-  - [ ] `POST /v1/transactions/transfer`:
-    - [ ] Accept `CreateTransferDto`.
-    - [ ] Accept step‑up token from header or body (as designed).
-    - [ ] Call `transactionsService.createTransfer(user.userId, dto, stepUpPayload)`.
-  - [ ] `GET /v1/transactions/:id`:
-    - [ ] Call `transactionsService.getTransactionForUser(user.userId, id)`.
-  - [ ] Optional: `POST /v1/recipients/resolve`:
-    - [ ] Allow clients to resolve identifiers to recipient details before sending.
-  - [ ] Add Swagger annotations and ensure response shapes match envelope standard.
-- [ ] Wire module into `AppModule`
-  - [ ] Import `TransactionsModule` in `src/app.module.ts`.
-- [ ] Update `docs/openapi/openapi.yaml`
-  - [ ] Add schemas for wallet and transfer DTOs.
-  - [ ] Add paths for new endpoints with correct security, headers, and responses.
+- [x] Implement `TransactionsService`
+  - [x] Helper: `resolveWalletForUser(userId: string)`:
+    - [x] Delegates to `WalletsService.getOrCreateWalletForUser`.
+  - [x] Helper: `resolveRecipient(dtoRecipient)`:
+    - [x] If `userId` provided:
+      - [x] Fetch user by `id`.
+    - [x] Else if `email` provided:
+      - [x] Normalize email (trim + lowercase).
+      - [x] Fetch user by `email`.
+    - [x] If not found:
+      - [x] Throw `ProblemException.notFound('Recipient not found')` with `RECIPIENT_NOT_FOUND`.
+  - [x] Helper: `checkWalletStatuses(senderWallet, recipientWallet)`:
+    - [x] Ensure sender `status === ACTIVE`.
+    - [x] Ensure recipient `status !== CLOSED`.
+    - [x] Throw `WALLET_BLOCKED` as appropriate.
+  - [x] Helper: `checkCurrency(senderWallet, recipientWallet, dtoCurrency)`:
+    - [x] Ensure all three currencies match; reject otherwise.
+  - [x] Helper: `checkLimitsAndBalance(senderWallet, amountMinor, now)`:
+    - [x] Compare `amountMinor` against `TRANSFER_MIN_AMOUNT_MINOR` and `TRANSFER_MAX_AMOUNT_MINOR`.
+    - [x] Query outgoing transfers for current day and compute `dailyTotal`.
+    - [x] Ensure `dailyTotal + amountMinor <= TRANSFER_DAILY_LIMIT_MINOR`.
+    - [x] Ensure `senderWallet.availableBalanceMinor >= amountMinor`.
+    - [x] Throw `LIMIT_EXCEEDED` or `INSUFFICIENT_FUNDS` as needed.
+  - [x] Helper: `needsStepUp(amountMinor, dailyTotal)`:
+    - [x] Evaluate against `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` and other criteria.
+  - [x] `createTransfer(senderUserId, dto, stepUpPayload?)`:
+    - [x] Resolve sender user and recipient user.
+    - [x] Resolve sender/recipient wallets.
+    - [x] Check `senderUserId !== recipientUser.id` (throw `SAME_WALLET_TRANSFER` if violated).
+    - [x] Check wallet statuses and currency.
+    - [x] Pre‑compute amount and `now`.
+    - [x] Check idempotency using `clientReference`:
+      - [x] If provided, look up existing transaction for `(fromWalletId, clientReference)`.
+      - [x] If found:
+        - [x] If recipient/amount/currency match, return existing transaction.
+        - [x] Otherwise throw `409 Conflict`.
+    - [x] Compute `dailyTotal` for outgoing transfers.
+    - [x] Decide whether step‑up is required via `needsStepUp`.
+    - [x] If step‑up required:
+      - [x] Validate `stepUpPayload` (see Phase 4) or require `stepUpToken` from caller.
+    - [x] Execute Prisma `$transaction`:
+      - [x] Reload sender and recipient wallets inside the transaction.
+      - [x] Re‑validate balance and limits with up‑to‑date values.
+      - [x] Compute new balances.
+      - [x] Create `WalletTransaction` record.
+      - [x] Create corresponding `WalletLedgerEntry` rows for sender (`DEBIT`) and recipient (`CREDIT`).
+      - [x] Update `Wallet.availableBalanceMinor` for both wallets to match computed balances.
+    - [x] Return a DTO mapped from the created `WalletTransaction`.
+  - [x] `getTransactionForUser(userId, transactionId)`:
+    - [x] Resolve wallet for `userId`.
+    - [x] Find `WalletTransaction` where:
+      - [x] `id = transactionId` AND
+      - [x] `fromWalletId = wallet.id OR toWalletId = wallet.id`.
+    - [x] If not found → `404 Not Found`.
+    - [x] Determine role: `SENDER` or `RECIPIENT`.
+    - [x] Map to `TransferResponseDto`.
+- [x] Implement `TransactionsController`
+  - [x] Apply `@UseGuards(JwtAuthGuard)` at controller level.
+  - [x] `POST /v1/transactions/transfer`:
+    - [x] Accept `CreateTransferDto`.
+    - [x] Accept step‑up token from header or body (as designed).
+    - [x] Call `transactionsService.createTransfer(user.userId, dto, stepUpPayload)`.
+  - [x] `GET /v1/transactions/:id`:
+    - [x] Call `transactionsService.getTransactionForUser(user.userId, id)`.
+  - [x] Optional: `POST /v1/recipients/resolve`:
+    - [x] Allow clients to resolve identifiers to recipient details before sending.
+  - [x] Add Swagger annotations and ensure response shapes match envelope standard.
+- [x] Wire module into `AppModule`
+  - [x] Import `TransactionsModule` in `src/app.module.ts`.
+- [x] Update `docs/openapi/openapi.yaml`
+  - [x] Add schemas for wallet and transfer DTOs.
+  - [x] Add paths for new endpoints with correct security, headers, and responses.
 
 ## Phase 4 – Step‑Up Integration
 
@@ -307,15 +307,15 @@ This document breaks down the implementation work for the wallet and internal P2
     - [ ] `needsStepUp` returns correct result for threshold boundaries.
     - [ ] `verifyStepUpToken` enforces type, subject, purpose, and expiry.
 - [ ] E2E tests (extend `test/app.e2e-spec.ts` or add new file)
-  - [ ] Happy path:
-    - [ ] Register two users; verify both emails.
-    - [ ] Seed balance for sender (either via direct DB or placeholder top‑up helper).
-    - [ ] Perform a transfer:
-      - [ ] `POST /v1/transactions/transfer` without step‑up (small amount).
-      - [ ] Assert:
-        - [ ] Sender balance decreased by amount.
-        - [ ] Recipient balance increased by amount.
-        - [ ] Transaction shows up in both histories with correct roles.
+  - [x] Happy path:
+    - [x] Register two users; verify both emails.
+    - [x] Seed balance for sender (either via direct DB or placeholder top‑up helper).
+    - [x] Perform a transfer:
+      - [x] `POST /v1/transactions/transfer` without step‑up (small amount).
+      - [x] Assert:
+        - [x] Sender balance decreased by amount.
+        - [x] Recipient balance increased by amount.
+        - [x] Transaction shows up in both histories with correct roles.
   - [ ] Step‑up path:
     - [ ] Use existing WebAuthn fake to obtain `stepUpToken`.
     - [ ] Perform a high‑value transfer:

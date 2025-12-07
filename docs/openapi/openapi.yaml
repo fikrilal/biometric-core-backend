@@ -14,6 +14,7 @@ tags:
   - name: Users
   - name: Devices
   - name: Wallets
+  - name: Transactions
 components:
   securitySchemes:
     bearerAuth:
@@ -29,6 +30,9 @@ components:
       schema: { type: boolean }
     Location:
       description: Absolute or path URL of the created resource.
+      schema: { type: string }
+    StepUpToken:
+      description: Step-Up token used for sensitive transfers.
       schema: { type: string }
   parameters:
     XRequestId:
@@ -59,6 +63,12 @@ components:
         maximum: 250
         default: 25
       description: Page size (default 25, max 250).
+    StepUpToken:
+      in: header
+      name: X-Step-Up-Token
+      required: false
+      schema: { type: string }
+      description: Step-Up token for sensitive transfers.
   responses:
     Problem:
       description: Error response
@@ -158,6 +168,84 @@ components:
           enum: [PENDING, COMPLETED, FAILED, REVERSED]
         createdAt: { type: string, format: date-time }
         stepUpUsed: { type: boolean }
+
+    TransferRecipient:
+      type: object
+      properties:
+        userId: { type: string }
+        email: { type: string, format: email }
+
+    CreateTransferInput:
+      type: object
+      required: [recipient, amountMinor, currency]
+      properties:
+        recipient:
+          $ref: '#/components/schemas/TransferRecipient'
+        amountMinor:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+        note:
+          type: string
+        clientReference:
+          type: string
+        stepUpToken:
+          type: string
+
+    Transfer:
+      type: object
+      required:
+        - transactionId
+        - type
+        - role
+        - fromWalletId
+        - toWalletId
+        - amountMinor
+        - feeMinor
+        - currency
+        - status
+        - createdAt
+        - stepUpUsed
+      properties:
+        transactionId: { type: string }
+        type:
+          type: string
+          enum: [P2P_TRANSFER, ADJUSTMENT, PROMO_CREDIT]
+        role:
+          type: string
+          enum: [SENDER, RECIPIENT]
+        fromWalletId: { type: string }
+        toWalletId: { type: string }
+        amountMinor: { type: integer }
+        feeMinor: { type: integer }
+        currency: { type: string }
+        note: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED, REVERSED]
+        createdAt: { type: string, format: date-time }
+        stepUpUsed: { type: boolean }
+        clientReference: { type: string, nullable: true }
+
+    ResolveRecipientInput:
+      type: object
+      required: [identifier]
+      properties:
+        identifier:
+          type: object
+          properties:
+            userId: { type: string }
+            email: { type: string, format: email }
+
+    ResolveRecipientResponse:
+      type: object
+      required: [userId, displayName, maskedIdentifier, canReceiveTransfers]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        maskedIdentifier: { type: string }
+        canReceiveTransfers: { type: boolean }
 
     AuthChallengeInput:
       oneOf:
@@ -288,6 +376,18 @@ components:
           type: array
           items: { $ref: '#/components/schemas/WalletTransaction' }
         meta: { $ref: '#/components/schemas/Meta' }
+
+    EnvelopeTransfer:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Transfer' }
+
+    EnvelopeResolveRecipient:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/ResolveRecipientResponse' }
 
     EnvelopeDevices:
       type: object
@@ -639,6 +739,87 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EnvelopeWalletTransactions' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/transactions/transfer:
+    post:
+      tags: [Transactions]
+      summary: Create wallet transfer
+      operationId: createTransfer
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/StepUpToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTransferInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeTransfer' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/transactions/{id}:
+    get:
+      tags: [Transactions]
+      summary: Get transfer by id
+      operationId: getTransfer
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeTransfer' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/transactions/recipients/resolve:
+    post:
+      tags: [Transactions]
+      summary: Resolve recipient identifier
+      operationId: resolveRecipient
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveRecipientInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeResolveRecipient' }
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'

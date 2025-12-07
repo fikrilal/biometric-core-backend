@@ -17,6 +17,7 @@ import { WebAuthnModule } from './webauthn/webauthn.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 import { DevicesModule } from './devices/devices.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { WalletsModule } from './wallets/wallets.module';
     EnrollmentModule,
     DevicesModule,
     WalletsModule,
+    TransactionsModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },

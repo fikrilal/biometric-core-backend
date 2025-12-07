@@ -7,6 +7,7 @@ import { MockEmailService } from '../src/auth-password/email.service';
 import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
 import { WebauthnSignCountMode } from '../src/config/env.validation';
 import { TokenService } from '../src/auth-password/token.service';
+import { PrismaClient } from '@prisma/client';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -14,6 +15,8 @@ import type {
   AuthenticationResponseJSON,
   WebAuthnCredential,
 } from '@simplewebauthn/server/esm/types';
+
+const prisma = new PrismaClient();
 
 class FakeWebAuthnService {
   private readonly registrationChallenge = 'test-registration-challenge';
@@ -120,6 +123,7 @@ describe('App e2e (health)', () => {
 
   afterAll(async () => {
     await app.close();
+    await prisma.$disconnect();
   });
 
   beforeEach(() => {
@@ -558,5 +562,90 @@ describe('App e2e (health)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(Array.isArray(historyRes.body.data)).toBe(true);
+  });
+
+  it('supports transfers between wallets', async () => {
+    const server = getServer();
+    const senderEmail = `sender-${Date.now()}@example.com`;
+    const recipientEmail = `recipient-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    await request(server)
+      .post('/v1/auth/password/register')
+      .send({ email: senderEmail, password, firstName: 'Sender', lastName: 'User' })
+      .expect(201);
+    await request(server)
+      .post('/v1/auth/password/register')
+      .send({ email: recipientEmail, password, firstName: 'Recipient', lastName: 'User' })
+      .expect(201);
+
+    const senderVerify = MockEmailService.pullLatestVerificationToken(senderEmail);
+    const recipientVerify = MockEmailService.pullLatestVerificationToken(recipientEmail);
+    await request(server)
+      .post('/v1/auth/password/verify/confirm')
+      .send({ token: senderVerify })
+      .expect(200);
+    await request(server)
+      .post('/v1/auth/password/verify/confirm')
+      .send({ token: recipientVerify })
+      .expect(200);
+
+    const senderLogin = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email: senderEmail, password })
+      .expect(200);
+    const recipientLogin = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email: recipientEmail, password })
+      .expect(200);
+
+    const senderToken = senderLogin.body.data.accessToken as string;
+    const recipientToken = recipientLogin.body.data.accessToken as string;
+
+    await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .expect(200);
+    await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${recipientToken}`)
+      .expect(200);
+
+    const senderWallet = await prisma.wallet.findFirstOrThrow({
+      where: { user: { email: senderEmail.toLowerCase() } },
+    });
+    await prisma.wallet.update({
+      where: { id: senderWallet.id },
+      data: { availableBalanceMinor: 1_000_000 },
+    });
+
+    const clientReference = `client-${Date.now()}`;
+    const transfer = await request(server)
+      .post('/v1/transactions/transfer')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .set('Idempotency-Key', `transfer-${Date.now()}`)
+      .send({
+        recipient: { email: recipientEmail },
+        amountMinor: 100_000,
+        currency: 'IDR',
+        note: 'Test transfer',
+        clientReference,
+      })
+      .expect(201);
+
+    expect(transfer.body.data.amountMinor).toBe(100_000);
+    expect(transfer.body.data.clientReference).toBe(clientReference);
+
+    const senderWalletAfter = await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .expect(200);
+    expect(senderWalletAfter.body.data.availableBalanceMinor).toBe(900_000);
+
+    const recipientWalletAfter = await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${recipientToken}`)
+      .expect(200);
+    expect(recipientWalletAfter.body.data.availableBalanceMinor).toBe(100_000);
   });
 });
