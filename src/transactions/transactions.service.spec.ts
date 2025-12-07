@@ -12,6 +12,7 @@ import { WalletsService } from '../wallets/wallets.service';
 import { TokenService } from '../auth-password/token.service';
 import { ErrorCode } from '../common/errors/error-codes';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { TransactionsMetricsService } from './transactions.metrics';
 
 type ConfigMock = ConfigService & { get: jest.Mock };
 type WalletsMock = WalletsService & { getOrCreateWalletForUser: jest.Mock };
@@ -21,6 +22,12 @@ type PrismaMock = PrismaService & {
   $transaction: jest.Mock;
 };
 type TokenMock = TokenService & { verifyStepUpToken: jest.Mock };
+type MetricsMock = TransactionsMetricsService & {
+  recordTransferCreated: jest.Mock;
+  recordTransferFailed: jest.Mock;
+  recordStepUpRequired: jest.Mock;
+  recordTransferReplayed: jest.Mock;
+};
 type TransactionClient = {
   wallet: {
     findUniqueOrThrow: jest.Mock;
@@ -39,6 +46,7 @@ interface ServiceContext {
   prisma: PrismaMock;
   wallets: WalletsMock;
   tokens: TokenMock;
+  metrics: MetricsMock;
   senderWallet: Wallet;
   recipientWallet: Wallet;
   txMocks: {
@@ -51,6 +59,7 @@ interface ServiceContext {
 const defaultConfigValues = {
   TRANSFER_MIN_AMOUNT_MINOR: 1_000,
   TRANSFER_MAX_AMOUNT_MINOR: 50_000_000,
+  TRANSFER_ABSOLUTE_MAX_MINOR: 100_000_000,
   TRANSFER_DAILY_LIMIT_MINOR: 200_000_000,
   HIGH_VALUE_TRANSFER_THRESHOLD_MINOR: 5_000_000,
 };
@@ -192,6 +201,13 @@ function createServiceContext(options?: {
     })),
   } as TokenMock;
 
+  const metrics = {
+    recordTransferCreated: jest.fn(),
+    recordTransferFailed: jest.fn(),
+    recordStepUpRequired: jest.fn(),
+    recordTransferReplayed: jest.fn(),
+  } as MetricsMock;
+
   if (options?.stepUpPayload !== undefined) {
     if (options.stepUpPayload === null) {
       tokens.verifyStepUpToken.mockRejectedValue(new Error('invalid'));
@@ -200,12 +216,13 @@ function createServiceContext(options?: {
     }
   }
 
-  const service = new TransactionsService(prisma, wallets, config, tokens);
+  const service = new TransactionsService(prisma, wallets, config, tokens, metrics);
   return {
     service,
     prisma,
     wallets,
     tokens,
+    metrics,
     senderWallet,
     recipientWallet,
     txMocks: {
@@ -253,6 +270,9 @@ describe('TransactionsService', () => {
       ],
     });
     expect(ctx.txMocks.update).toHaveBeenCalledTimes(2);
+    expect(ctx.metrics.recordTransferCreated).toHaveBeenCalledWith(
+      expect.objectContaining({ amountMinor: 100_000, currency: 'IDR', stepUpUsed: false }),
+    );
   });
 
   it('rejects transfers to the same user', async () => {
@@ -268,6 +288,7 @@ describe('TransactionsService', () => {
       status: 400,
     });
     expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.SAME_WALLET_TRANSFER);
   });
 
   it('rejects when sender balance is insufficient', async () => {
@@ -280,6 +301,7 @@ describe('TransactionsService', () => {
       status: 400,
     });
     expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.INSUFFICIENT_FUNDS);
   });
 
   it('rejects when amount exceeds per-transaction limit', async () => {
@@ -292,6 +314,7 @@ describe('TransactionsService', () => {
       response: expect.objectContaining({ code: ErrorCode.LIMIT_EXCEEDED }),
       status: 400,
     });
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.LIMIT_EXCEEDED);
   });
 
   it('rejects when daily limit would be exceeded', async () => {
@@ -304,6 +327,20 @@ describe('TransactionsService', () => {
       response: expect.objectContaining({ code: ErrorCode.LIMIT_EXCEEDED }),
       status: 400,
     });
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.LIMIT_EXCEEDED);
+  });
+
+  it('enforces absolute guard even when configured max is higher', async () => {
+    const ctx = createServiceContext({
+      configOverrides: { TRANSFER_MAX_AMOUNT_MINOR: 1_000_000_000, TRANSFER_ABSOLUTE_MAX_MINOR: 75_000 },
+    });
+    const dto: CreateTransferDto = { ...defaultDto, amountMinor: 100_000 };
+
+    await expect(ctx.service.createTransfer('user-sender', dto, {})).rejects.toMatchObject({
+      response: expect.objectContaining({ code: ErrorCode.LIMIT_EXCEEDED }),
+      status: 400,
+    });
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.LIMIT_EXCEEDED);
   });
 
   it('returns existing transaction when clientReference matches', async () => {
@@ -318,6 +355,7 @@ describe('TransactionsService', () => {
 
     expect(result.transactionId).toBe('txn-1');
     expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+    expect(ctx.metrics.recordTransferReplayed).toHaveBeenCalled();
   });
 
   it('fails idempotency when parameters differ', async () => {
@@ -352,6 +390,7 @@ describe('TransactionsService', () => {
       }),
     );
     expect(result.stepUpUsed).toBe(true);
+    expect(ctx.metrics.recordStepUpRequired).toHaveBeenCalledWith('high_value');
   });
 
   it('requires step-up when daily usage nears the configured limit', async () => {
@@ -370,6 +409,8 @@ describe('TransactionsService', () => {
       response: expect.objectContaining({ code: ErrorCode.UNAUTHORIZED }),
       status: 401,
     });
+    expect(ctx.metrics.recordStepUpRequired).toHaveBeenCalledWith('daily_usage');
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.UNAUTHORIZED);
   });
 
   it('rejects when step-up purpose is invalid', async () => {
@@ -387,6 +428,8 @@ describe('TransactionsService', () => {
       response: expect.objectContaining({ code: ErrorCode.FORBIDDEN }),
       status: 403,
     });
+    expect(ctx.metrics.recordStepUpRequired).toHaveBeenCalledWith('high_value');
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.FORBIDDEN);
   });
 
   it('rejects when step-up token subject does not match user', async () => {
@@ -404,5 +447,7 @@ describe('TransactionsService', () => {
       response: expect.objectContaining({ code: ErrorCode.UNAUTHORIZED }),
       status: 401,
     });
+    expect(ctx.metrics.recordStepUpRequired).toHaveBeenCalledWith('high_value');
+    expect(ctx.metrics.recordTransferFailed).toHaveBeenCalledWith(ErrorCode.UNAUTHORIZED);
   });
 });

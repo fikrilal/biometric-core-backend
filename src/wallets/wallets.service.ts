@@ -49,6 +49,8 @@ export class WalletsService {
   private readonly defaultCurrency: string;
   private readonly transferMinAmount: number;
   private readonly transferMaxAmount: number;
+  private readonly transferAbsoluteMax: number;
+  private readonly transferEffectiveMax: number;
   private readonly transferDailyLimit: number;
 
   constructor(
@@ -58,6 +60,8 @@ export class WalletsService {
     this.defaultCurrency = this.config.get<string>('WALLET_DEFAULT_CURRENCY', 'IDR');
     this.transferMinAmount = this.config.get<number>('TRANSFER_MIN_AMOUNT_MINOR', 1000);
     this.transferMaxAmount = this.config.get<number>('TRANSFER_MAX_AMOUNT_MINOR', 50_000_000);
+    this.transferAbsoluteMax = this.config.get<number>('TRANSFER_ABSOLUTE_MAX_MINOR', 100_000_000);
+    this.transferEffectiveMax = Math.min(this.transferMaxAmount, this.transferAbsoluteMax);
     this.transferDailyLimit = this.config.get<number>('TRANSFER_DAILY_LIMIT_MINOR', 200_000_000);
   }
 
@@ -73,7 +77,7 @@ export class WalletsService {
       status: wallet.status,
       limits: {
         minAmountMinor: this.transferMinAmount,
-        perTransactionMaxMinor: this.transferMaxAmount,
+        perTransactionMaxMinor: this.transferEffectiveMax,
         dailyMaxMinor: this.transferDailyLimit,
         dailyUsedMinor,
       },

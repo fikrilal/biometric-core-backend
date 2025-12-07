@@ -13,6 +13,7 @@ const defaultConfigValues = {
   WALLET_DEFAULT_CURRENCY: 'IDR',
   TRANSFER_MIN_AMOUNT_MINOR: 1_000,
   TRANSFER_MAX_AMOUNT_MINOR: 50_000_000,
+  TRANSFER_ABSOLUTE_MAX_MINOR: 100_000_000,
   TRANSFER_DAILY_LIMIT_MINOR: 200_000_000,
 };
 
@@ -137,5 +138,31 @@ describe('WalletsService', () => {
     const view = await service.getWalletView('user-3');
 
     expect(view.limits.dailyUsedMinor).toBe(0);
+  });
+
+  it('clamps per-transaction limits when absolute guard is lower', async () => {
+    const prisma = createPrismaMock();
+    const config = createConfigMock({
+      TRANSFER_MAX_AMOUNT_MINOR: 200_000_000,
+      TRANSFER_ABSOLUTE_MAX_MINOR: 75_000,
+    });
+    const service = new WalletsService(prisma, config);
+    const wallet = {
+      id: 'wallet-4',
+      userId: 'user-4',
+      currency: 'IDR',
+      status: WalletStatus.ACTIVE,
+      availableBalanceMinor: BigInt(0),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prisma.wallet.upsert.mockResolvedValue(wallet);
+    prisma.walletTransaction.aggregate.mockResolvedValue({
+      _sum: { amountMinor: BigInt(0) },
+    });
+
+    const view = await service.getWalletView('user-4');
+
+    expect(view.limits.perTransactionMaxMinor).toBe(75_000);
   });
 });

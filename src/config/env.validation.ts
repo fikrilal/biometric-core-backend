@@ -95,6 +95,11 @@ class EnvVars {
   @Min(1)
   TRANSFER_MAX_AMOUNT_MINOR: number = 50_000_000;
 
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 100_000_000))
+  @IsInt()
+  @Min(1)
+  TRANSFER_ABSOLUTE_MAX_MINOR: number = 100_000_000;
+
   @Transform(({ value }) => (value !== undefined ? Number(value) : 200_000_000))
   @IsInt()
   @Min(1)

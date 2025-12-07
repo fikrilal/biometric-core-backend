@@ -208,7 +208,7 @@ This document breaks down the implementation work for the wallet and internal P2
     - [x] Ensure `senderWallet.availableBalanceMinor >= amountMinor`.
     - [x] Throw `LIMIT_EXCEEDED` or `INSUFFICIENT_FUNDS` as needed.
   - [x] Helper: `needsStepUp(amountMinor, dailyTotal)`:
-    - [x] Evaluate against `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` and other criteria.
+    - [x] Evaluate against `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` and other criteria, returning both a boolean and the reason (high-value vs daily-usage).
   - [x] `createTransfer(senderUserId, dto, stepUpPayload?)`:
     - [x] Resolve sender user and recipient user.
     - [x] Resolve sender/recipient wallets.
@@ -335,30 +335,30 @@ This document breaks down the implementation work for the wallet and internal P2
 
 **Goal:** Add logging, metrics, and guardrails to operate the wallet/transfer feature safely.
 
-- [ ] Logging
-  - [ ] Add structured logs in `TransactionsService`:
-    - [ ] On transfer creation:
-      - [ ] `transactionId`, `fromWalletId`, `toWalletId`, `amountMinor`, `currency`, `stepUpUsed`.
-    - [ ] On failures:
-      - [ ] Reason (`INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, etc.).
-      - [ ] `userId` and IP (without PII in messages).
-  - [ ] Ensure logs do not contain:
-    - [ ] Access tokens.
-    - [ ] Step‑up tokens.
-    - [ ] Raw WebAuthn data.
-- [ ] Metrics (if observability stack is wired)
-  - [ ] Add counters/gauges:
-    - [ ] Total transfers per day.
-    - [ ] Total transferred amount.
-    - [ ] Transfers requiring step‑up vs not.
-    - [ ] Failed transfers by error code.
-- [ ] Safety checks
-  - [ ] Consider adding a global max limit per environment (e.g., if config is mis‑set).
-  - [ ] Ensure any future adjustment/credit operations also go through double‑entry ledger and respect invariants.
-- [ ] Documentation
-  - [ ] Update `docs/finance/wallet-and-transfer-product.md` and `docs/finance/wallet-and-transfer-technical.md` with:
-    - [ ] Finalized limits.
-    - [ ] Behaviour of step‑up under different thresholds.
-    - [ ] Any operational runbooks (e.g., how to investigate a disputed transfer).
+- [x] Logging
+  - [x] Add structured logs in `TransactionsService`:
+    - [x] On transfer creation:
+      - [x] `transactionId`, `fromWalletId`, `toWalletId`, `amountMinor`, `currency`, `stepUpUsed`.
+    - [x] On failures:
+      - [x] Reason (`INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, etc.).
+      - [x] `userId` and IP (without PII in messages).
+  - [x] Ensure logs do not contain:
+    - [x] Access tokens.
+    - [x] Step‑up tokens.
+    - [x] Raw WebAuthn data.
+- [x] Metrics (if observability stack is wired)
+  - [x] Add counters/gauges:
+    - [x] Total transfers per day (tracked via `TransactionsMetricsService`).
+    - [x] Total transferred amount.
+    - [x] Transfers requiring step‑up vs not.
+    - [x] Failed transfers by error code / replays.
+- [x] Safety checks
+  - [x] Add a global max limit per environment (e.g., if config is mis‑set) via `TRANSFER_ABSOLUTE_MAX_MINOR`.
+  - [x] Ensure any future adjustment/credit operations also go through double‑entry ledger and respect invariants. (Documented guardrail in technical doc.)
+- [x] Documentation
+  - [x] Update `docs/finance/wallet-and-transfer-product.md` and `docs/finance/wallet-and-transfer-technical.md` with:
+    - [x] Finalized limits and safety cap.
+    - [x] Behaviour of step‑up under different thresholds and observability hooks.
+    - [x] Operational runbooks for logging/metrics expectations.
 
 Once these phases are complete, the platform will have a robust internal wallet and P2P transfer feature that aligns with existing biometric auth, response standards, and operational practices.

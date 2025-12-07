@@ -205,6 +205,8 @@ The wallet should support configurable limits that can be tuned per environment 
 
 - **Per‑transaction limit**
   - Maximum amount for a single transfer.
+- **Absolute safety cap**
+  - Hard guardrail (set via `TRANSFER_ABSOLUTE_MAX_MINOR`) that overrides any misconfigured per‑transaction limit. This ensures even if an environment accidentally raises per‑transaction caps too high, an upper bound still exists.
 - **Daily/period transfer limit**
   - Maximum total value a user can send per day (or other period).
 - **Minimum transfer amount**
@@ -215,6 +217,24 @@ The wallet should support configurable limits that can be tuned per environment 
   - `closed`: no operations; usually final state for regulatory reasons.
 
 These limits should be surfaced to the client where appropriate (e.g., “You can send up to X today”) so UX can pre‑validate and show helpful messaging.
+
+## Observability & Operations
+
+- **Structured logging**
+  - Every transfer attempt emits structured logs:
+    - `transfer.created` includes `transactionId`, `fromWalletId`, `toWalletId`, amount, currency, `stepUpUsed`, and client reference.
+    - `transfer.replayed` captures idempotent retries.
+    - `transfer.failed` captures the stable `ErrorCode`, `userId`, wallet IDs, and request IP (no tokens or PII).
+- **Metrics**
+  - Lightweight counters track:
+    - Transfers created vs. failed.
+    - Transfers that required step‑up (reason: high value vs 80% daily limit).
+    - Transfers that actually consumed a step‑up token.
+    - Idempotent replays.
+  - These are emitted as structured debug logs for now, ready to be scraped by Prometheus/OpenTelemetry in future phases.
+- **Safety guardrails**
+  - `TRANSFER_ABSOLUTE_MAX_MINOR` enforces a “circuit breaker” cap regardless of other config to prevent runaway limits.
+  - Step‑up is enforced automatically for high‑risk transfers; missing or invalid tokens are logged + metered to make abuse visible.
 
 ## Error Handling & User Messaging
 

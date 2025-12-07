@@ -276,6 +276,7 @@ Suggested environment‑based configuration:
 
 - `TRANSFER_MIN_AMOUNT_MINOR` – minimum allowed transfer.
 - `TRANSFER_MAX_AMOUNT_MINOR` – per‑transaction maximum.
+- `TRANSFER_ABSOLUTE_MAX_MINOR` – guardrail cap that overrides any misconfigured per‑transaction maximum.
 - `TRANSFER_DAILY_LIMIT_MINOR` – maximum total amount a user can send per day.
 - `HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` – transfers at/above this require biometric step‑up.
 
@@ -299,7 +300,7 @@ TransactionsService should decide whether step‑up is required for a particular
 - Amount thresholds:
   - `amountMinor >= HIGH_VALUE_TRANSFER_THRESHOLD_MINOR` → requires step‑up.
 - Daily usage:
-  - `dailyTotalSent + amountMinor >= 0.8 * TRANSFER_DAILY_LIMIT_MINOR` → requires step‑up (treat transfers that would consume 80%+ of the daily allowance as high risk).
+  - `dailyTotalSent + amountMinor >= 0.8 * TRANSFER_DAILY_LIMIT_MINOR` → requires step‑up (treat transfers that would consume 80%+ of the daily allowance as high risk). Metrics record the reason (`high_value` vs `daily_usage`).
 - Future criteria:
   - “First transfer to this recipient”.
   - Suspicious patterns surfaced by a risk engine.
@@ -307,7 +308,10 @@ TransactionsService should decide whether step‑up is required for a particular
 The policy decision can be implemented in a helper method:
 
 ```ts
-private needsStepUp(amountMinor: bigint, dailyTotal: bigint): boolean;
+private needsStepUp(
+  amountMinor: number,
+  dailyTotal: number,
+): { required: boolean; reason?: 'high_value' | 'daily_usage' };
 ```
 
 ### Token Validation
@@ -329,6 +333,15 @@ When a valid step‑up token is used:
 
 - Mark the transaction as `stepUpUsed = true`.
 - Optionally log token metadata (without storing the token itself).
+
+## Observability & Safety
+
+- **Structured logging**
+  - `TransactionsService` logs `transfer.created`, `transfer.replayed`, and `transfer.failed` events with wallet IDs, amount, currency, step‑up usage, `clientReference`, and request IP. Error logs only include stable error codes—no secrets or token material.
+- **Metrics**
+  - `TransactionsMetricsService` maintains lightweight counters (currently emitted as debug logs) for totals created, failed, replays, and step‑up requirements/usages. These hooks are ready to be wired to OTEL/Prometheus exporters later.
+- **Global guardrail**
+  - The service calculates an “effective” per‑transaction limit as `min(TRANSFER_MAX_AMOUNT_MINOR, TRANSFER_ABSOLUTE_MAX_MINOR)` and exposes the same to clients via `WalletsService`. Even if an env misconfigures `TRANSFER_MAX_AMOUNT_MINOR`, the guard prevents transfers above the absolute cap and surfaces a controlled error.
 
 ## Idempotency
 

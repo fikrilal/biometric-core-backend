@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletsService } from '../wallets/wallets.service';
@@ -14,16 +14,40 @@ import { ProblemException } from '../common/errors/problem.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { TokenService } from '../auth-password/token.service';
 import { ResolveRecipientDto, ResolveRecipientResponse } from './dto/resolve-recipient.dto';
+import { StepUpRequiredReason, TransactionsMetricsService } from './transactions.metrics';
 
 interface StepUpPayload {
   token?: string;
   headerToken?: string;
 }
 
+interface TransferRequestContext {
+  ip?: string;
+}
+
+interface TransferLogContext {
+  userId: string;
+  fromWalletId: string;
+  toWalletId?: string;
+  recipientUserId?: string;
+  clientReference?: string;
+  amountMinor?: number;
+  currency?: string;
+  ip?: string;
+}
+
+interface StepUpDecision {
+  required: boolean;
+  reason?: StepUpRequiredReason;
+}
+
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
   private readonly transferMinAmount: number;
   private readonly transferMaxAmount: number;
+  private readonly transferAbsoluteMax: number;
+  private readonly transferEffectiveMax: number;
   private readonly transferDailyLimit: number;
   private readonly highValueThreshold: number;
 
@@ -32,9 +56,12 @@ export class TransactionsService {
     private readonly wallets: WalletsService,
     private readonly config: ConfigService,
     private readonly tokens: TokenService,
+    private readonly metrics: TransactionsMetricsService,
   ) {
     this.transferMinAmount = this.config.get<number>('TRANSFER_MIN_AMOUNT_MINOR', 1000);
     this.transferMaxAmount = this.config.get<number>('TRANSFER_MAX_AMOUNT_MINOR', 50_000_000);
+    this.transferAbsoluteMax = this.config.get<number>('TRANSFER_ABSOLUTE_MAX_MINOR', 100_000_000);
+    this.transferEffectiveMax = Math.min(this.transferMaxAmount, this.transferAbsoluteMax);
     this.transferDailyLimit = this.config.get<number>('TRANSFER_DAILY_LIMIT_MINOR', 200_000_000);
     this.highValueThreshold = this.config.get<number>(
       'HIGH_VALUE_TRANSFER_THRESHOLD_MINOR',
@@ -88,124 +115,151 @@ export class TransactionsService {
     userId: string,
     dto: CreateTransferDto,
     stepUp: StepUpPayload,
+    requestContext?: TransferRequestContext,
   ): Promise<TransferResponse> {
     const senderWallet = await this.wallets.getOrCreateWalletForUser(userId);
-    const recipientUser = await this.resolveRecipientUser(dto.recipient, userId);
-    const recipientWallet = await this.wallets.getOrCreateWalletForUser(recipientUser.id);
+    const logContext: TransferLogContext = {
+      userId,
+      fromWalletId: senderWallet.id,
+      clientReference: dto.clientReference ?? undefined,
+      ip: requestContext?.ip,
+      amountMinor: dto.amountMinor,
+      currency: dto.currency,
+    };
 
-    this.ensureWalletStatuses(senderWallet, recipientWallet);
-    this.ensureCurrencyMatch(senderWallet, recipientWallet, dto.currency);
+    try {
+      const recipientUser = await this.resolveRecipientUser(dto.recipient, userId);
+      logContext.recipientUserId = recipientUser.id;
+      const recipientWallet = await this.wallets.getOrCreateWalletForUser(recipientUser.id);
+      logContext.toWalletId = recipientWallet.id;
 
-    const amount = BigInt(dto.amountMinor);
-    this.ensureAmountWithinLimits(dto.amountMinor);
+      this.ensureWalletStatuses(senderWallet, recipientWallet);
+      this.ensureCurrencyMatch(senderWallet, recipientWallet, dto.currency);
 
-    const dailyTotal = await this.sumOutgoingForToday(senderWallet.id);
-    if (dailyTotal + dto.amountMinor > this.transferDailyLimit) {
-      throw new ProblemException(400, {
-        title: 'Daily limit exceeded',
-        code: ErrorCode.LIMIT_EXCEEDED,
-      });
-    }
+      const amount = BigInt(dto.amountMinor);
+      this.ensureAmountWithinLimits(dto.amountMinor);
 
-    const senderBalance = BigInt(senderWallet.availableBalanceMinor);
-    if (senderBalance < amount) {
-      throw new ProblemException(400, {
-        title: 'Insufficient funds',
-        code: ErrorCode.INSUFFICIENT_FUNDS,
-      });
-    }
-
-    const requiresStepUp = this.needsStepUp(dto.amountMinor, dailyTotal);
-    if (requiresStepUp) {
-      const token =
-        stepUp.headerToken?.trim() || dto.stepUpToken?.trim();
-      if (!token) {
-        throw new ProblemException(401, {
-          title: 'Step-up token required',
-          code: ErrorCode.UNAUTHORIZED,
+      const dailyTotal = await this.sumOutgoingForToday(senderWallet.id);
+      if (dailyTotal + dto.amountMinor > this.transferDailyLimit) {
+        throw new ProblemException(400, {
+          title: 'Daily limit exceeded',
+          code: ErrorCode.LIMIT_EXCEEDED,
         });
       }
-      await this.verifyStepUpToken(token, userId);
-    }
 
-    if (dto.clientReference) {
-      const existing = await this.prisma.walletTransaction.findFirst({
-        where: {
-          fromWalletId: senderWallet.id,
-          clientReference: dto.clientReference,
-        },
-      });
-      if (existing) {
-        this.ensureIdempotentMatch(existing, recipientWallet.id, dto);
-        return this.toResponse(existing, 'SENDER');
-      }
-    }
-
-    const transaction = await this.prisma.$transaction(async (tx) => {
-      const currentSender = await tx.wallet.findUniqueOrThrow({
-        where: { id: senderWallet.id },
-      });
-      const currentRecipient = await tx.wallet.findUniqueOrThrow({
-        where: { id: recipientWallet.id },
-      });
-      const senderBalanceNow = BigInt(currentSender.availableBalanceMinor);
-      if (senderBalanceNow < amount) {
+      const senderBalance = BigInt(senderWallet.availableBalanceMinor);
+      if (senderBalance < amount) {
         throw new ProblemException(400, {
           title: 'Insufficient funds',
           code: ErrorCode.INSUFFICIENT_FUNDS,
         });
       }
-      const newSenderBalance = senderBalanceNow - amount;
-      const recipientBalance = BigInt(currentRecipient.availableBalanceMinor);
-      const newRecipientBalance = recipientBalance + amount;
 
-      const created = await tx.walletTransaction.create({
-        data: {
-          type: WalletTransactionType.P2P_TRANSFER,
-          status: WalletTransactionStatus.COMPLETED,
-          fromWalletId: senderWallet.id,
-          toWalletId: recipientWallet.id,
-          amountMinor: amount,
-          feeMinor: BigInt(0),
-          currency: senderWallet.currency,
-          note: dto.note,
-          clientReference: dto.clientReference,
-          stepUpUsed: requiresStepUp,
-        },
-      });
+      const stepUpDecision = this.needsStepUp(dto.amountMinor, dailyTotal);
+      if (stepUpDecision.required) {
+        this.metrics.recordStepUpRequired(stepUpDecision.reason ?? 'high_value');
+        const token = stepUp.headerToken?.trim() || dto.stepUpToken?.trim();
+        if (!token) {
+          throw new ProblemException(401, {
+            title: 'Step-up token required',
+            code: ErrorCode.UNAUTHORIZED,
+          });
+        }
+        await this.verifyStepUpToken(token, userId);
+      }
 
-      await tx.walletLedgerEntry.createMany({
-        data: [
-          {
-            transactionId: created.id,
-            walletId: senderWallet.id,
-            direction: 'DEBIT',
-            amountMinor: amount,
-            balanceAfterMinor: newSenderBalance,
+      if (dto.clientReference) {
+        const existing = await this.prisma.walletTransaction.findFirst({
+          where: {
+            fromWalletId: senderWallet.id,
+            clientReference: dto.clientReference,
           },
-          {
-            transactionId: created.id,
-            walletId: recipientWallet.id,
-            direction: 'CREDIT',
+        });
+        if (existing) {
+          this.ensureIdempotentMatch(existing, recipientWallet.id, dto);
+          this.metrics.recordTransferReplayed();
+          this.logTransferReplay(logContext, existing);
+          return this.toResponse(existing, 'SENDER');
+        }
+      }
+
+      const transaction = await this.prisma.$transaction(async (tx) => {
+        const currentSender = await tx.wallet.findUniqueOrThrow({
+          where: { id: senderWallet.id },
+        });
+        const currentRecipient = await tx.wallet.findUniqueOrThrow({
+          where: { id: recipientWallet.id },
+        });
+        const senderBalanceNow = BigInt(currentSender.availableBalanceMinor);
+        if (senderBalanceNow < amount) {
+          throw new ProblemException(400, {
+            title: 'Insufficient funds',
+            code: ErrorCode.INSUFFICIENT_FUNDS,
+          });
+        }
+        const newSenderBalance = senderBalanceNow - amount;
+        const recipientBalance = BigInt(currentRecipient.availableBalanceMinor);
+        const newRecipientBalance = recipientBalance + amount;
+
+        const created = await tx.walletTransaction.create({
+          data: {
+            type: WalletTransactionType.P2P_TRANSFER,
+            status: WalletTransactionStatus.COMPLETED,
+            fromWalletId: senderWallet.id,
+            toWalletId: recipientWallet.id,
             amountMinor: amount,
-            balanceAfterMinor: newRecipientBalance,
+            feeMinor: BigInt(0),
+            currency: senderWallet.currency,
+            note: dto.note,
+            clientReference: dto.clientReference,
+            stepUpUsed: stepUpDecision.required,
           },
-        ],
+        });
+
+        await tx.walletLedgerEntry.createMany({
+          data: [
+            {
+              transactionId: created.id,
+              walletId: senderWallet.id,
+              direction: 'DEBIT',
+              amountMinor: amount,
+              balanceAfterMinor: newSenderBalance,
+            },
+            {
+              transactionId: created.id,
+              walletId: recipientWallet.id,
+              direction: 'CREDIT',
+              amountMinor: amount,
+              balanceAfterMinor: newRecipientBalance,
+            },
+          ],
+        });
+
+        await tx.wallet.update({
+          where: { id: senderWallet.id },
+          data: { availableBalanceMinor: newSenderBalance },
+        });
+        await tx.wallet.update({
+          where: { id: recipientWallet.id },
+          data: { availableBalanceMinor: newRecipientBalance },
+        });
+
+        return created;
       });
 
-      await tx.wallet.update({
-        where: { id: senderWallet.id },
-        data: { availableBalanceMinor: newSenderBalance },
+      const response = this.toResponse(transaction, 'SENDER');
+      this.metrics.recordTransferCreated({
+        amountMinor: response.amountMinor,
+        currency: response.currency,
+        stepUpUsed: response.stepUpUsed,
       });
-      await tx.wallet.update({
-        where: { id: recipientWallet.id },
-        data: { availableBalanceMinor: newRecipientBalance },
-      });
-
-      return created;
-    });
-
-    return this.toResponse(transaction, 'SENDER');
+      this.logTransferSuccess(logContext, response);
+      return response;
+    } catch (error) {
+      this.metrics.recordTransferFailed(this.extractErrorCode(error));
+      this.logTransferFailure(logContext, error);
+      throw error;
+    }
   }
 
   private async resolveRecipientUser(
@@ -275,7 +329,7 @@ export class TransactionsService {
         code: ErrorCode.LIMIT_EXCEEDED,
       });
     }
-    if (amount > this.transferMaxAmount) {
+    if (amount > this.transferEffectiveMax) {
       throw new ProblemException(400, {
         title: 'Amount exceeds per-transaction limit',
         code: ErrorCode.LIMIT_EXCEEDED,
@@ -283,11 +337,14 @@ export class TransactionsService {
     }
   }
 
-  private needsStepUp(amount: number, dailyTotal: number) {
+  private needsStepUp(amount: number, dailyTotal: number): StepUpDecision {
     if (amount >= this.highValueThreshold) {
-      return true;
+      return { required: true, reason: 'high_value' };
     }
-    return dailyTotal + amount >= this.transferDailyLimit * 0.8;
+    if (dailyTotal + amount >= this.transferDailyLimit * 0.8) {
+      return { required: true, reason: 'daily_usage' };
+    }
+    return { required: false };
   }
 
   private async verifyStepUpToken(token: string, userId: string) {
@@ -396,5 +453,57 @@ export class TransactionsService {
       return email.split('@')[0];
     }
     return 'Recipient';
+  }
+
+  private logTransferSuccess(context: TransferLogContext, response: TransferResponse) {
+    this.logger.log({
+      event: 'transfer.created',
+      userId: context.userId,
+      fromWalletId: context.fromWalletId,
+      toWalletId: response.toWalletId,
+      transactionId: response.transactionId,
+      amountMinor: response.amountMinor,
+      currency: response.currency,
+      stepUpUsed: response.stepUpUsed,
+      clientReference: context.clientReference,
+      ip: context.ip,
+    });
+  }
+
+  private logTransferReplay(context: TransferLogContext, transaction: WalletTransaction) {
+    this.logger.log({
+      event: 'transfer.replayed',
+      userId: context.userId,
+      fromWalletId: context.fromWalletId,
+      toWalletId: transaction.toWalletId,
+      transactionId: transaction.id,
+      clientReference: context.clientReference,
+    });
+  }
+
+  private logTransferFailure(context: TransferLogContext, error: unknown) {
+    this.logger.warn({
+      event: 'transfer.failed',
+      userId: context.userId,
+      fromWalletId: context.fromWalletId,
+      toWalletId: context.toWalletId,
+      recipientUserId: context.recipientUserId,
+      clientReference: context.clientReference,
+      amountMinor: context.amountMinor,
+      currency: context.currency,
+      ip: context.ip,
+      reason: this.extractErrorCode(error) ?? 'unknown',
+    });
+  }
+
+  private extractErrorCode(error: unknown): string | undefined {
+    if (error instanceof ProblemException) {
+      const response = error.getResponse() as { code?: string } | string;
+      if (typeof response === 'object' && response !== null && 'code' in response) {
+        const code = (response as { code?: string }).code;
+        return typeof code === 'string' ? code : undefined;
+      }
+    }
+    return undefined;
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 import { TransactionsService } from './transactions.service';
@@ -20,6 +20,7 @@ export class TransactionsController {
     @CurrentUser() user: FastifyRequest['user'],
     @Body() dto: CreateTransferDto,
     @Headers('x-step-up-token') stepUpToken?: string,
+    @Req() req?: FastifyRequest,
   ): Promise<TransferResponse> {
     if (!user) {
       throw new Error('Missing authenticated user in request');
@@ -28,6 +29,7 @@ export class TransactionsController {
       user.userId,
       dto,
       { headerToken: stepUpToken, token: dto.stepUpToken },
+      { ip: req?.ip },
     );
   }
 
