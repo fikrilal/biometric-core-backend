@@ -41,7 +41,7 @@ class FakeWebAuthnService {
 
   async verifyRegistration(
     response: RegistrationResponseJSON,
-    expectedChallenge: string,
+    _expectedChallenge: string,
   ) {
     // In tests we trust the wiring and ignore the actual challenge value.
     // Always treat the response as a valid registration.
@@ -318,7 +318,7 @@ describe('App e2e (health)', () => {
     const password = 'Password123!';
 
     // Register user
-    const register = await request(server)
+    await request(server)
       .post('/v1/auth/password/register')
       .send({ email, password, firstName: 'Bio', lastName: 'User' })
       .expect(201);
@@ -520,5 +520,43 @@ describe('App e2e (health)', () => {
     expect(stepUpToken.length).toBeGreaterThan(0);
     const decoded = await tokenService.verifyStepUpToken(stepUpToken);
     expect(decoded.purpose).toBe(purpose);
+  });
+
+  it('exposes wallet balance and history endpoints for authenticated users', async () => {
+    const server = getServer();
+    const email = `wallet-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    await request(server)
+      .post('/v1/auth/password/register')
+      .send({ email, password, firstName: 'Wallet', lastName: 'User' })
+      .expect(201);
+
+    const verifyToken = MockEmailService.pullLatestVerificationToken(email);
+    expect(verifyToken).toBeDefined();
+    await request(server)
+      .post('/v1/auth/password/verify/confirm')
+      .send({ token: verifyToken })
+      .expect(200);
+
+    const login = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password })
+      .expect(200);
+    const accessToken = login.body.data.accessToken as string;
+    expect(typeof accessToken).toBe('string');
+
+    const walletRes = await request(server)
+      .get('/v1/wallets/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(walletRes.body.data.currency).toBeDefined();
+    expect(walletRes.body.data.limits).toBeDefined();
+
+    const historyRes = await request(server)
+      .get('/v1/wallets/me/transactions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(Array.isArray(historyRes.body.data)).toBe(true);
   });
 });

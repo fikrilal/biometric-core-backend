@@ -99,62 +99,62 @@ This document breaks down the implementation work for the wallet and internal P2
 
 ## Phase 2 – WalletsModule (Balance & History)
 
-**Goal:** Implement read‑only wallet balance and transaction history endpoints.
+**Goal:** Implement read-only wallet balance and transaction history endpoints.
 
-- [ ] Create module skeleton under `src/wallets/`
-  - [ ] `wallets.module.ts`
-    - [ ] Import `PrismaModule`.
-    - [ ] Import `AuthModule` to access `JwtAuthGuard` and `CurrentUser`.
-    - [ ] Provide `WalletsService`.
-    - [ ] Register `WalletsController`.
-  - [ ] `wallets.service.ts`
-  - [ ] `wallets.controller.ts`
-  - [ ] DTOs:
-    - [ ] `dto/wallet.response.ts`.
-    - [ ] `dto/wallet-transaction.response.ts`.
-- [ ] Implement `WalletsService`
-  - [ ] `getOrCreateWalletForUser(userId: string)`:
-    - [ ] Try to find existing wallet.
-    - [ ] If none:
-      - [ ] Create a wallet with:
-        - [ ] `availableBalanceMinor = 0`.
-        - [ ] `status = ACTIVE`.
-        - [ ] `currency` from environment or default constant.
-    - [ ] Return wallet entity.
-  - [ ] `getWalletView(userId: string)`:
-    - [ ] Use `getOrCreateWalletForUser`.
-    - [ ] Map to `WalletResponseDto`:
-      - [ ] `walletId`, `userId`, `currency`, `availableBalanceMinor`, `status`.
-      - [ ] Embed effective limits from config (`perTransactionMaxMinor`, `dailyMaxMinor`, `dailyUsedMinor`).
-    - [ ] Compute `dailyUsedMinor` by summing outgoing transfers for “today”.
-  - [ ] `getTransactionsForUser(userId: string, cursor?: string, limit?: number)`:
-    - [ ] Find wallet for `userId`.
-    - [ ] Query `WalletTransaction` where:
-      - [ ] `fromWalletId = wallet.id OR toWalletId = wallet.id`.
-    - [ ] Apply cursor‑based pagination using `createdAt` + `id`.
-    - [ ] Map each transaction to `WalletTransactionResponseDto`:
-      - [ ] `transactionId`, `type`, `direction` (`INCOMING`/`OUTGOING`).
-      - [ ] `counterpartyUserId`.
-      - [ ] `counterpartyMaskedName` + `counterpartyMaskedIdentifier`, using `User` data.
-      - [ ] `amountMinor`, `feeMinor`, `currency`, `note`, `status`, `createdAt`, `stepUpUsed`.
-    - [ ] Wrap in `toPaginated(...)` and rely on the global response envelope.
-- [ ] Implement `WalletsController`
-  - [ ] Apply `@UseGuards(JwtAuthGuard)` at controller or method level.
-  - [ ] `GET /v1/wallets/me`:
-    - [ ] Route under `@Controller('wallets')`.
-    - [ ] Handler `getMe(@CurrentUser() user)`:
-      - [ ] Validate `user` presence.
-      - [ ] Delegate to `walletsService.getWalletView(user.userId)`.
-  - [ ] `GET /v1/wallets/me/transactions`:
-    - [ ] Use `PageQueryDto` for query parameters.
-    - [ ] Delegate to `walletsService.getTransactionsForUser(user.userId, q.cursor, q.limit)`.
-  - [ ] Add Swagger decorators:
-    - [ ] `@ApiTags('wallets')`.
-    - [ ] `@ApiOperation` for each endpoint.
-- [ ] Wire module into `AppModule`
-  - [ ] Import `WalletsModule` in `src/app.module.ts`.
-- [ ] Update docs
-  - [ ] Ensure `docs/openapi/openapi.yaml` reflects `GET /v1/wallets/me` and `/v1/wallets/me/transactions`.
+- [x] Create module skeleton under `src/wallets/`
+  - [x] `wallets.module.ts`
+    - [x] Import `PrismaModule`.
+    - [x] Import `AuthModule` to access `JwtAuthGuard` and `CurrentUser`.
+    - [x] Provide `WalletsService`.
+    - [x] Register `WalletsController`.
+  - [x] `wallets.service.ts`
+  - [x] `wallets.controller.ts`
+  - [x] DTOs:
+    - [x] `dto/wallet.response.ts`.
+    - [x] `dto/wallet-transaction.response.ts`.
+- [x] Implement `WalletsService`
+  - [x] `getOrCreateWalletForUser(userId: string)`:
+    - [x] Try to find existing wallet.
+    - [x] If none:
+      - [x] Create a wallet with:
+        - [x] `availableBalanceMinor = 0`.
+        - [x] `status = ACTIVE`.
+        - [x] `currency` from environment or default constant.
+    - [x] Return wallet entity.
+  - [x] `getWalletView(userId: string)`:
+    - [x] Use `getOrCreateWalletForUser`.
+    - [x] Map to `WalletResponseDto`:
+      - [x] `walletId`, `userId`, `currency`, `availableBalanceMinor`, `status`.
+      - [x] Embed effective limits from config (`perTransactionMaxMinor`, `dailyMaxMinor`, `dailyUsedMinor`).
+    - [x] Compute `dailyUsedMinor` by summing outgoing transfers for “today”.
+  - [x] `getTransactionsForUser(userId: string, cursor?: string, limit?: number)`:
+    - [x] Find wallet for `userId`.
+    - [x] Query `WalletTransaction` where:
+      - [x] `fromWalletId = wallet.id OR toWalletId = wallet.id`.
+    - [x] Apply cursor-based pagination using `createdAt` + `id`.
+    - [x] Map each transaction to `WalletTransactionResponseDto`:
+      - [x] `transactionId`, `type`, `direction` (`INCOMING`/`OUTGOING`).
+      - [x] `counterpartyUserId`.
+      - [x] `counterpartyMaskedName` + `counterpartyMaskedIdentifier`, using `User` data.
+      - [x] `amountMinor`, `feeMinor`, `currency`, `note`, `status`, `createdAt`, `stepUpUsed`.
+    - [x] Wrap in `toPaginated(...)` and rely on the global response envelope.
+- [x] Implement `WalletsController`
+  - [x] Apply `@UseGuards(JwtAuthGuard)` at controller or method level.
+  - [x] `GET /v1/wallets/me`:
+    - [x] Route under `@Controller('wallets')`.
+    - [x] Handler `getMe(@CurrentUser() user)`:
+      - [x] Validate `user` presence.
+      - [x] Delegate to `walletsService.getWalletView(user.userId)`.
+  - [x] `GET /v1/wallets/me/transactions`:
+    - [x] Use `PageQueryDto` for query parameters.
+    - [x] Delegate to `walletsService.getTransactionsForUser(user.userId, q.cursor, q.limit)`.
+  - [x] Add Swagger decorators:
+    - [x] `@ApiTags('wallets')`.
+    - [x] `@ApiOperation` for each endpoint.
+- [x] Wire module into `AppModule`
+  - [x] Import `WalletsModule` in `src/app.module.ts`.
+- [x] Update docs
+  - [x] Ensure `docs/openapi/openapi.yaml` reflects `GET /v1/wallets/me` and `/v1/wallets/me/transactions`.
 
 ## Phase 3 – TransactionsModule (Create & Read Transfers)
 

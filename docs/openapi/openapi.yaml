@@ -13,6 +13,7 @@ tags:
   - name: Enrollment
   - name: Users
   - name: Devices
+  - name: Wallets
 components:
   securitySchemes:
     bearerAuth:
@@ -102,6 +103,61 @@ components:
         credentialId: { type: string }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    WalletLimits:
+      type: object
+      properties:
+        minAmountMinor: { type: integer, minimum: 0 }
+        perTransactionMaxMinor: { type: integer, minimum: 0 }
+        dailyMaxMinor: { type: integer, minimum: 0 }
+        dailyUsedMinor: { type: integer, minimum: 0 }
+
+    Wallet:
+      type: object
+      required: [walletId, userId, currency, availableBalanceMinor, status, limits]
+      properties:
+        walletId: { type: string }
+        userId: { type: string }
+        currency: { type: string }
+        availableBalanceMinor: { type: integer }
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, CLOSED]
+        limits:
+          $ref: '#/components/schemas/WalletLimits'
+
+    WalletTransaction:
+      type: object
+      required:
+        - transactionId
+        - type
+        - direction
+        - amountMinor
+        - feeMinor
+        - currency
+        - status
+        - createdAt
+        - stepUpUsed
+      properties:
+        transactionId: { type: string }
+        type:
+          type: string
+          enum: [P2P_TRANSFER, ADJUSTMENT, PROMO_CREDIT]
+        direction:
+          type: string
+          enum: [INCOMING, OUTGOING]
+        counterpartyUserId: { type: string, nullable: true }
+        counterpartyMaskedName: { type: string, nullable: true }
+        counterpartyMaskedIdentifier: { type: string, nullable: true }
+        amountMinor: { type: integer }
+        feeMinor: { type: integer }
+        currency: { type: string }
+        note: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED, REVERSED]
+        createdAt: { type: string, format: date-time }
+        stepUpUsed: { type: boolean }
 
     AuthChallengeInput:
       oneOf:
@@ -216,6 +272,21 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/User' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    EnvelopeWallet:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Wallet' }
+
+    EnvelopeWalletTransactions:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/WalletTransaction' }
         meta: { $ref: '#/components/schemas/Meta' }
 
     EnvelopeDevices:
@@ -527,6 +598,50 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/wallets/me:
+    get:
+      tags: [Wallets]
+      summary: Get current user's wallet
+      operationId: getCurrentWallet
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeWallet' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/wallets/me/transactions:
+    get:
+      tags: [Wallets]
+      summary: List wallet transactions for current user
+      operationId: listCurrentWalletTransactions
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeWalletTransactions' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
       security:

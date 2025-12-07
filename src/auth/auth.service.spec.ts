@@ -7,7 +7,15 @@ import { AuthTokensService } from '../auth-password/auth-tokens.service';
 import { TokenService } from '../auth-password/token.service';
 import { WebauthnSignCountMode } from '../config/env.validation';
 import { ErrorCode } from '../common/errors/error-codes';
-import { ProblemException } from '../common/errors/problem.exception';
+interface TestCredential {
+  credentialId: string;
+  userId: string;
+  publicKey: Buffer;
+  signCount: number;
+  revoked: boolean;
+  transports: string | null;
+  devices: { id: string; active: boolean }[];
+}
 
 describe('AuthService signCount enforcement', () => {
   const prisma = {
@@ -38,7 +46,7 @@ describe('AuthService signCount enforcement', () => {
     jest.resetAllMocks();
   });
 
-  const buildCredential = (overrides: Partial<any> = {}) => ({
+  const buildCredential = (overrides: Partial<TestCredential> = {}): TestCredential => ({
     credentialId: 'cred-1',
     userId: 'user-1',
     publicKey: Buffer.from([1, 2, 3]),
