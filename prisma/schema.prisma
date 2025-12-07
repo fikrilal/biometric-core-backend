@@ -10,6 +10,171 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  firstName String   @default("")
+  lastName  String   @default("")
+  passwordHash String?
+  emailVerified   Boolean  @default(false)
+  verificationRequestedAt DateTime?
   createdAt DateTime @default(now())
+  refreshTokens RefreshToken[]
+  emailTokens EmailVerificationToken[]
+  resetTokens PasswordResetToken[]
+  credentials Credential[]
+  devices     Device[]
+  wallet      Wallet?
 }
 
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Credential {
+  id           String   @id @default(cuid())
+  userId       String
+  credentialId String   @unique
+  publicKey    Bytes
+  signCount    Int      @default(0)
+  aaguid       String?
+  transports   String?
+  deviceName   String?
+  revoked      Boolean  @default(false)
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  devices  Device[]
+
+  @@index([userId])
+}
+
+model Device {
+  id                String   @id @default(cuid())
+  userId            String
+  credentialId      String
+  label             String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  deactivatedAt     DateTime?
+  deactivatedReason String?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credential Credential @relation(fields: [credentialId], references: [credentialId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([credentialId])
+}
+
+enum WalletStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum WalletTransactionType {
+  P2P_TRANSFER
+  ADJUSTMENT
+  PROMO_CREDIT
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum WalletLedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+model Wallet {
+  id                    String                @id @default(cuid())
+  userId                String                @unique
+  currency              String
+  status                WalletStatus          @default(ACTIVE)
+  availableBalanceMinor BigInt                @default(0)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outgoingTransactions  WalletTransaction[]   @relation("WalletOutgoing")
+  incomingTransactions  WalletTransaction[]   @relation("WalletIncoming")
+  ledgerEntries         WalletLedgerEntry[]
+
+  @@index([currency])
+}
+
+model WalletTransaction {
+  id              String                  @id @default(cuid())
+  type            WalletTransactionType
+  status          WalletTransactionStatus @default(COMPLETED)
+  fromWalletId    String?
+  toWalletId      String?
+  amountMinor     BigInt
+  feeMinor        BigInt                  @default(0)
+  currency        String
+  note            String?
+  clientReference String?
+  stepUpUsed      Boolean                 @default(false)
+  createdAt       DateTime                @default(now())
+  completedAt     DateTime?
+
+  fromWallet      Wallet?                 @relation("WalletOutgoing", fields: [fromWalletId], references: [id])
+  toWallet        Wallet?                 @relation("WalletIncoming", fields: [toWalletId], references: [id])
+  ledgerEntries   WalletLedgerEntry[]
+
+  @@index([fromWalletId, createdAt])
+  @@index([toWalletId, createdAt])
+  @@index([clientReference])
+}
+
+model WalletLedgerEntry {
+  id                String                @id @default(cuid())
+  transactionId     String
+  walletId          String
+  direction         WalletLedgerDirection
+  amountMinor       BigInt
+  balanceAfterMinor BigInt
+  createdAt         DateTime              @default(now())
+
+  transaction       WalletTransaction     @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  wallet            Wallet                @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt, id])
+}

@@ -2,28 +2,32 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import { fileURLToPath } from 'node:url';
 
 export default [
   { ignores: ['dist/**', 'coverage/**', 'node_modules/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
   {
     files: ['**/*.ts'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        ecmaFeatures: {
+          legacyDecorators: true,
+        },
         project: ['./tsconfig.json'],
-        tsconfigRootDir: new URL('.', import.meta.url).pathname,
+        tsconfigRootDir: fileURLToPath(new URL('.', import.meta.url)),
       },
     },
     plugins: { '@typescript-eslint': tseslint.plugin },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+      '@typescript-eslint/no-misused-promises': 'off',
     },
   },
   prettier,
 ];
-

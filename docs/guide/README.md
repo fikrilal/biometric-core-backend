@@ -51,9 +51,17 @@ This guide explains the core patterns used across the codebase so new features f
 - Lint: `npm run spec:lint` (Spectral).
 - Swagger UI is served at `/docs` from code-first decorators.
 
+## Auth Password Module
+- Specs: `docs/features/auth-password.md`.
+- Password hashing: Argon2id (see `auth-password/auth-password.service.ts`).
+- Token signing: `TokenService` (jose) issues access/refresh tokens.
+
 ## Data & Integrations
 - Prisma (Postgres): `src/prisma/*`, schema at `prisma/schema.prisma`.
 - Redis client: `src/redis/*` (lazy connect; `REDIS_URL` in `.env`).
+- Email delivery:
+  - Default MockEmailService logs verification/reset tokens to stdout (used for local dev + tests).
+  - Set `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS` to enable the Resend provider; optional `EMAIL_FROM_NAME`, `EMAIL_VERIFICATION_URL`, and `PASSWORD_RESET_URL` customize branding/links.
 
 ## Testing Notes
 - E2E uses the global envelope and Problem Details (404 assertions include `status` and `traceId`).

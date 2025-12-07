@@ -13,6 +13,8 @@ tags:
   - name: Enrollment
   - name: Users
   - name: Devices
+  - name: Wallets
+  - name: Transactions
 components:
   securitySchemes:
     bearerAuth:
@@ -28,6 +30,9 @@ components:
       schema: { type: boolean }
     Location:
       description: Absolute or path URL of the created resource.
+      schema: { type: string }
+    StepUpToken:
+      description: Step-Up token used for sensitive transfers.
       schema: { type: string }
   parameters:
     XRequestId:
@@ -58,6 +63,12 @@ components:
         maximum: 250
         default: 25
       description: Page size (default 25, max 250).
+    StepUpToken:
+      in: header
+      name: X-Step-Up-Token
+      required: false
+      schema: { type: string }
+      description: Step-Up token for sensitive transfers.
   responses:
     Problem:
       description: Error response
@@ -85,10 +96,12 @@ components:
 
     User:
       type: object
-      required: [id, email, createdAt]
+      required: [id, email, firstName, lastName, createdAt]
       properties:
         id: { type: string }
         email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
         createdAt: { type: string, format: date-time }
 
     Device:
@@ -100,6 +113,139 @@ components:
         credentialId: { type: string }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    WalletLimits:
+      type: object
+      properties:
+        minAmountMinor: { type: integer, minimum: 0 }
+        perTransactionMaxMinor: { type: integer, minimum: 0 }
+        dailyMaxMinor: { type: integer, minimum: 0 }
+        dailyUsedMinor: { type: integer, minimum: 0 }
+
+    Wallet:
+      type: object
+      required: [walletId, userId, currency, availableBalanceMinor, status, limits]
+      properties:
+        walletId: { type: string }
+        userId: { type: string }
+        currency: { type: string }
+        availableBalanceMinor: { type: integer }
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, CLOSED]
+        limits:
+          $ref: '#/components/schemas/WalletLimits'
+
+    WalletTransaction:
+      type: object
+      required:
+        - transactionId
+        - type
+        - direction
+        - amountMinor
+        - feeMinor
+        - currency
+        - status
+        - createdAt
+        - stepUpUsed
+      properties:
+        transactionId: { type: string }
+        type:
+          type: string
+          enum: [P2P_TRANSFER, ADJUSTMENT, PROMO_CREDIT]
+        direction:
+          type: string
+          enum: [INCOMING, OUTGOING]
+        counterpartyUserId: { type: string, nullable: true }
+        counterpartyMaskedName: { type: string, nullable: true }
+        counterpartyMaskedIdentifier: { type: string, nullable: true }
+        amountMinor: { type: integer }
+        feeMinor: { type: integer }
+        currency: { type: string }
+        note: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED, REVERSED]
+        createdAt: { type: string, format: date-time }
+        stepUpUsed: { type: boolean }
+
+    TransferRecipient:
+      type: object
+      properties:
+        userId: { type: string }
+        email: { type: string, format: email }
+
+    CreateTransferInput:
+      type: object
+      required: [recipient, amountMinor, currency]
+      properties:
+        recipient:
+          $ref: '#/components/schemas/TransferRecipient'
+        amountMinor:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+        note:
+          type: string
+        clientReference:
+          type: string
+        stepUpToken:
+          type: string
+
+    Transfer:
+      type: object
+      required:
+        - transactionId
+        - type
+        - role
+        - fromWalletId
+        - toWalletId
+        - amountMinor
+        - feeMinor
+        - currency
+        - status
+        - createdAt
+        - stepUpUsed
+      properties:
+        transactionId: { type: string }
+        type:
+          type: string
+          enum: [P2P_TRANSFER, ADJUSTMENT, PROMO_CREDIT]
+        role:
+          type: string
+          enum: [SENDER, RECIPIENT]
+        fromWalletId: { type: string }
+        toWalletId: { type: string }
+        amountMinor: { type: integer }
+        feeMinor: { type: integer }
+        currency: { type: string }
+        note: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED, REVERSED]
+        createdAt: { type: string, format: date-time }
+        stepUpUsed: { type: boolean }
+        clientReference: { type: string, nullable: true }
+
+    ResolveRecipientInput:
+      type: object
+      required: [identifier]
+      properties:
+        identifier:
+          type: object
+          properties:
+            userId: { type: string }
+            email: { type: string, format: email }
+
+    ResolveRecipientResponse:
+      type: object
+      required: [userId, displayName, maskedIdentifier, canReceiveTransfers]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        maskedIdentifier: { type: string }
+        canReceiveTransfers: { type: boolean }
 
     AuthChallengeInput:
       oneOf:
@@ -114,16 +260,15 @@ components:
       description: Identify the user to authenticate.
 
     EnrollmentChallengeInput:
-      oneOf:
-        - type: object
-          required: [email]
-          properties:
-            email: { type: string, format: email }
-        - type: object
-          required: [userId]
-          properties:
-            userId: { type: string }
-      description: Identify the user to enroll a device for.
+      type: object
+      description: >
+        Optional parameters for creating an enrollment challenge. The user to enroll is derived
+        from the authenticated access token; clients may provide an optional device label.
+      properties:
+        deviceName:
+          type: string
+          maxLength: 128
+          description: Optional human-friendly label for the device being enrolled.
 
     ChallengeResponse:
       type: object
@@ -145,13 +290,38 @@ components:
           description: WebAuthn assertion response from the client.
           additionalProperties: true
 
-    AuthVerifyResponse:
+    StepUpChallengeInput:
       type: object
-      required: [accessToken, refreshToken, expiresIn]
+      description: Optional purpose for the step-up authentication.
+      properties:
+        purpose:
+          type: string
+          maxLength: 128
+          description: Purpose for step-up (e.g., transaction:transfer).
+
+    StepUpVerifyInput:
+      type: object
+      required: [challengeId, credential]
+      properties:
+        challengeId: { type: string }
+        credential:
+          type: object
+          description: WebAuthn assertion response from the client.
+          additionalProperties: true
+
+    StepUpVerifyResponse:
+      type: object
+      required: [stepUpToken]
+      properties:
+        stepUpToken: { type: string }
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, emailVerified]
       properties:
         accessToken: { type: string }
         refreshToken: { type: string }
-        expiresIn: { type: integer, format: int32, description: Expiration in seconds }
+        expiresIn: { type: integer, format: int32, description: Access token expiration in seconds }
+        emailVerified: { type: boolean, description: Whether the account email is verified }
 
     EnrollmentVerifyInput:
       type: object
@@ -192,6 +362,33 @@ components:
           items: { $ref: '#/components/schemas/User' }
         meta: { $ref: '#/components/schemas/Meta' }
 
+    EnvelopeWallet:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Wallet' }
+
+    EnvelopeWalletTransactions:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/WalletTransaction' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    EnvelopeTransfer:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Transfer' }
+
+    EnvelopeResolveRecipient:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/ResolveRecipientResponse' }
+
     EnvelopeDevices:
       type: object
       required: [data]
@@ -211,7 +408,22 @@ components:
       type: object
       required: [data]
       properties:
-        data: { $ref: '#/components/schemas/AuthVerifyResponse' }
+        data: { $ref: '#/components/schemas/AuthTokens' }
+    EnvelopeAuthTokens:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/AuthTokens' }
+    OperationResult:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+    EnvelopeOperationResult:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/OperationResult' }
 
     EnvelopeEnrollmentVerifyResponse:
       type: object
@@ -251,7 +463,6 @@ paths:
       operationId: authCreateChallenge
       parameters:
         - $ref: '#/components/parameters/XRequestId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -266,10 +477,9 @@ paths:
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
-            Idempotency-Replayed:
-              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
+      security: []
 
   /v1/auth/verify:
     post:
@@ -278,7 +488,6 @@ paths:
       operationId: authVerify
       parameters:
         - $ref: '#/components/parameters/XRequestId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -289,12 +498,10 @@ paths:
           description: Authenticated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthVerifyResponse' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
-            Idempotency-Replayed:
-              $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -324,6 +531,64 @@ paths:
               $ref: '#/components/headers/IdempotencyReplayed'
         default:
           $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/auth/step-up/challenge:
+    post:
+      tags: [Auth]
+      summary: Create step-up authentication challenge
+      operationId: authStepUpCreateChallenge
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpChallengeInput' }
+      responses:
+        '200':
+          description: Challenge issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeChallengeResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/auth/step-up/verify:
+    post:
+      tags: [Auth]
+      summary: Verify step-up authentication and issue token
+      operationId: authStepUpVerify
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpVerifyInput' }
+      responses:
+        '200':
+          description: Step-up verified
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/StepUpVerifyResponse' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
 
   /v1/enroll/verify:
     post:
@@ -438,10 +703,135 @@ paths:
       security:
         - bearerAuth: []
 
+  /v1/wallets/me:
+    get:
+      tags: [Wallets]
+      summary: Get current user's wallet
+      operationId: getCurrentWallet
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeWallet' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/wallets/me/transactions:
+    get:
+      tags: [Wallets]
+      summary: List wallet transactions for current user
+      operationId: listCurrentWalletTransactions
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeWalletTransactions' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/transactions/transfer:
+    post:
+      tags: [Transactions]
+      summary: Create wallet transfer
+      operationId: createTransfer
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/StepUpToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTransferInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeTransfer' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/transactions/{id}:
+    get:
+      tags: [Transactions]
+      summary: Get transfer by id
+      operationId: getTransfer
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeTransfer' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/transactions/recipients/resolve:
+    post:
+      tags: [Transactions]
+      summary: Resolve recipient identifier
+      operationId: resolveRecipient
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveRecipientInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeResolveRecipient' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
   /v1/devices:
     get:
       tags: [Devices]
-      summary: List devices for current user/tenant
+      summary: List devices for current user
       operationId: listDevices
       parameters:
         - $ref: '#/components/parameters/XRequestId'
@@ -488,3 +878,180 @@ paths:
           $ref: '#/components/responses/Problem'
       security:
         - bearerAuth: []
+  /v1/auth/password/register:
+    post:
+      tags: [Auth]
+      summary: Register with email/password
+      operationId: passwordRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, lastName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                firstName: { type: string }
+                lastName: { type: string }
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/login:
+    post:
+      tags: [Auth]
+      summary: Login with email/password
+      operationId: passwordLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate refresh token
+      operationId: passwordRefresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: New tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/logout:
+    post:
+      tags: [Auth]
+      summary: Logout/revoke refresh token
+      operationId: passwordLogout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200': { description: OK }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/verify/request:
+    post:
+      tags: [Auth]
+      summary: Send verification email
+      operationId: passwordVerifyRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/verify/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm email verification token
+      operationId: passwordVerifyConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/reset/request:
+    post:
+      tags: [Auth]
+      summary: Send password reset email
+      operationId: passwordResetRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'
+  /v1/auth/password/reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm password reset
+      operationId: passwordResetConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        default:
+          $ref: '#/components/responses/Problem'

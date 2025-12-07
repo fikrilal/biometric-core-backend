@@ -11,6 +11,13 @@ import { ResponseEnvelopeInterceptor } from './common/http/interceptors/response
 import { RequestIdInterceptor } from './common/http/interceptors/request-id.interceptor';
 import { ProblemDetailsFilter } from './common/http/filters/problem-details.filter';
 import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.interceptor';
+import { AuthPasswordModule } from './auth-password/auth-password.module';
+import { UsersModule } from './users/users.module';
+import { WebAuthnModule } from './webauthn/webauthn.module';
+import { EnrollmentModule } from './enrollment/enrollment.module';
+import { DevicesModule } from './devices/devices.module';
+import { WalletsModule } from './wallets/wallets.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -24,7 +31,14 @@ import { IdempotencyInterceptor } from './common/http/interceptors/idempotency.i
     PrismaModule,
     RedisModule,
     HealthModule,
+    WebAuthnModule,
     AuthModule,
+    UsersModule,
+    AuthPasswordModule,
+    EnrollmentModule,
+    DevicesModule,
+    WalletsModule,
+    TransactionsModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
