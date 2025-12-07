@@ -175,7 +175,7 @@ Dependencies:
 
 Responsibilities:
 
-- Ensure a wallet exists for each user (either lazily or via user‑creation hook).
+- Ensure a wallet exists for each user (for now via lazy creation the first time it is needed).
 - Expose:
   - `getWalletForUser(userId: string)` → wallet view DTO.
   - `getTransactionsForWallet(userId: string, cursor?: string, limit?: number)` → paginated history DTO.
@@ -186,7 +186,7 @@ Implementation details:
 
 - `getWalletForUser`:
   - Looks up wallet by `userId`.
-  - If missing and lazy creation is desired, creates a wallet with balance `0`.
+  - If missing, creates a wallet with balance `0` (since this project has no existing users, a separate backfill step is not required).
   - Maps to a DTO with:
     - `walletId`, `userId`, `currency`, `availableBalanceMinor`, `status`, `limits`.
 - `getTransactionsForWallet`:
@@ -407,4 +407,3 @@ Metrics/counters to consider:
   - Step‑up failures.
 
 These technical rules ensure that wallet and transfer behaviour is consistent, auditable, and aligned with the rest of the platform’s standards.
-

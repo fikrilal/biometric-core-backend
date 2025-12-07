@@ -70,14 +70,7 @@ This document breaks down the implementation work for the wallet and internal P2
 - [ ] Run Prisma migration
   - [ ] `npx prisma migrate dev --name wallet_transfers_init`.
   - [ ] `npx prisma generate`.
-  - [ ] Confirm generated client types for new models.
-- [ ] Backfill / bootstrap wallets
-  - [ ] Decide policy for existing users:
-    - [ ] Either lazy‑create wallets on first access, or
-    - [ ] Create wallets eagerly via a script or migration.
-  - [ ] If eager creation is chosen:
-    - [ ] Write a one‑off migration or script to:
-      - [ ] Create a `Wallet` for each `User` with `availableBalanceMinor = 0`.
+  - [ ] Confirm generated client types for new models (no backfill needed because there are no existing users yet).
 
 ## Phase 1 – Configuration & Error Codes
 
@@ -369,4 +362,3 @@ This document breaks down the implementation work for the wallet and internal P2
     - [ ] Any operational runbooks (e.g., how to investigate a disputed transfer).
 
 Once these phases are complete, the platform will have a robust internal wallet and P2P transfer feature that aligns with existing biometric auth, response standards, and operational practices.
-
