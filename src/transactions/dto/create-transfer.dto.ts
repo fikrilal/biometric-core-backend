@@ -9,11 +9,13 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TransferRecipientDto } from './recipient.dto';
+import { RequireExactlyOneIdentifier } from '../validators/recipient-identifier.constraint';
 
 export class CreateTransferDto {
   @ApiProperty({ type: TransferRecipientDto })
   @ValidateNested()
   @Type(() => TransferRecipientDto)
+  @RequireExactlyOneIdentifier()
   recipient!: TransferRecipientDto;
 
   @ApiProperty({ description: 'Amount in minor units', minimum: 1 })

@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { RequireExactlyOneIdentifier } from '../validators/recipient-identifier.constraint';
 
 class ResolveIdentifierDto {
   @ApiProperty({ required: false })
@@ -18,6 +19,7 @@ export class ResolveRecipientDto {
   @ApiProperty({ type: ResolveIdentifierDto })
   @ValidateNested()
   @Type(() => ResolveIdentifierDto)
+  @RequireExactlyOneIdentifier()
   identifier!: ResolveIdentifierDto;
 }
 

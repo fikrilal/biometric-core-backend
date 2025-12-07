@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletsService } from '../wallets/wallets.service';
 import {
@@ -29,13 +30,15 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallets: WalletsService,
+    private readonly config: ConfigService,
     private readonly tokens: TokenService,
   ) {
-    this.transferMinAmount = Number(process.env.TRANSFER_MIN_AMOUNT_MINOR ?? 1000);
-    this.transferMaxAmount = Number(process.env.TRANSFER_MAX_AMOUNT_MINOR ?? 50_000_000);
-    this.transferDailyLimit = Number(process.env.TRANSFER_DAILY_LIMIT_MINOR ?? 200_000_000);
-    this.highValueThreshold = Number(
-      process.env.HIGH_VALUE_TRANSFER_THRESHOLD_MINOR ?? 5_000_000,
+    this.transferMinAmount = this.config.get<number>('TRANSFER_MIN_AMOUNT_MINOR', 1000);
+    this.transferMaxAmount = this.config.get<number>('TRANSFER_MAX_AMOUNT_MINOR', 50_000_000);
+    this.transferDailyLimit = this.config.get<number>('TRANSFER_DAILY_LIMIT_MINOR', 200_000_000);
+    this.highValueThreshold = this.config.get<number>(
+      'HIGH_VALUE_TRANSFER_THRESHOLD_MINOR',
+      5_000_000,
     );
   }
 
@@ -52,17 +55,17 @@ export class TransactionsService {
         firstName: true,
         lastName: true,
         email: true,
-        wallet: { select: { status: true } },
       },
     });
-    if (!user || !user.wallet) {
+    if (!user) {
       throw ProblemException.notFound('Recipient not found');
     }
+    const wallet = await this.wallets.getOrCreateWalletForUser(user.id);
     return {
       userId: user.id,
       displayName: this.buildDisplayName(user.firstName, user.lastName, user.email),
       maskedIdentifier: this.maskEmail(user.email),
-      canReceiveTransfers: user.wallet.status !== 'CLOSED',
+      canReceiveTransfers: wallet.status !== 'CLOSED',
     };
   }
 
@@ -330,7 +333,10 @@ export class TransactionsService {
     if (recipient.email) {
       return { email: this.normalizeEmail(recipient.email) };
     }
-    return null;
+    throw new ProblemException(400, {
+      title: 'Recipient identifier required',
+      code: ErrorCode.VALIDATION_FAILED,
+    });
   }
 
   private normalizeEmail(email: string) {
