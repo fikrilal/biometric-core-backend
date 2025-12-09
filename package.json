@@ -5,7 +5,7 @@
   "description": "Biometric Core backend built with NestJS (Fastify)",
   "license": "MIT",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=20 <23"
   },
   "scripts": {
     "build": "nest build",
