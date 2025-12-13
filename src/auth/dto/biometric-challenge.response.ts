@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server/esm/types';
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 
 export class BiometricChallengeResponse {
   @ApiProperty()

@@ -14,7 +14,7 @@ import type {
   AuthenticatorTransportFuture,
   PublicKeyCredentialRequestOptionsJSON,
   WebAuthnCredential,
-} from '@simplewebauthn/server/esm/types';
+} from '@simplewebauthn/server';
 import { randomUUID } from 'crypto';
 import type { StepUpChallengeDto } from './dto/step-up-challenge.dto';
 import type { StepUpChallengeResponse } from './dto/step-up-challenge.response';

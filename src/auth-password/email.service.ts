@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 export abstract class EmailService {
   abstract sendVerification(email: string, token: string): Promise<void>;
@@ -124,8 +126,24 @@ export class ResendEmailService extends EmailService {
     });
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
-      this.logger.error(`Failed to send email via Resend: ${response.status} ${errorBody}`);
-      throw new Error('Failed to send email via Resend');
+      this.logger.error(
+        {
+          statusCode: response.status,
+          from: payload.from,
+        },
+        `Failed to send email via Resend: ${errorBody}`,
+      );
+
+      const isProd = this.config.get<string>('NODE_ENV') === 'production';
+      const detail = isProd
+        ? 'Email delivery failed.'
+        : `Email delivery failed (Resend ${response.status}). Check EMAIL_FROM_ADDRESS/EMAIL_FROM_NAME. Provider said: ${errorBody}`;
+
+      throw new ProblemException(502, {
+        title: 'Email delivery failed',
+        detail,
+        code: ErrorCode.INTERNAL,
+      });
     }
   }
 
@@ -163,7 +181,20 @@ export class ResendEmailService extends EmailService {
   }
 
   private formatFrom() {
-    return this.fromName ? `${this.fromName} <${this.fromAddress}>` : this.fromAddress!;
+    const address = (this.fromAddress ?? '').trim();
+    const name = (this.fromName ?? '').trim();
+
+    // Allow EMAIL_FROM_ADDRESS to already contain the full "Name <email@...>" format.
+    // This avoids accidentally producing invalid strings like `Name <Name <email@...>>`.
+    if (address.includes('<') && address.includes('>')) {
+      return address;
+    }
+
+    if (name) {
+      return `${name} <${address}>`;
+    }
+
+    return address;
   }
 }
 

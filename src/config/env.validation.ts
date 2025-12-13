@@ -120,6 +120,19 @@ export function validateEnv(config: Record<string, unknown>): EnvVars {
   if (validated.RESEND_API_KEY && !validated.EMAIL_FROM_ADDRESS) {
     throw new Error('EMAIL_FROM_ADDRESS is required when RESEND_API_KEY is set');
   }
+  if (validated.RESEND_API_KEY && validated.EMAIL_FROM_ADDRESS) {
+    const rawFrom = validated.EMAIL_FROM_ADDRESS.trim();
+    const extractedEmail = rawFrom.includes('<') && rawFrom.includes('>')
+      ? rawFrom.match(/<([^<>]+)>/)?.[1]?.trim()
+      : rawFrom;
+    const email = extractedEmail ?? '';
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!looksLikeEmail) {
+      throw new Error(
+        'EMAIL_FROM_ADDRESS must be an email (e.g., no-reply@example.com) or Name <no-reply@example.com>',
+      );
+    }
+  }
   if (validated.NODE_ENV !== NodeEnv.Test) {
     if (!validated.WEBAUTHN_RP_ID) {
       throw new Error('WEBAUTHN_RP_ID is required when NODE_ENV is not "test"');

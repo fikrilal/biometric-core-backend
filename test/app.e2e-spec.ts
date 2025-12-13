@@ -205,7 +205,7 @@ describe('App e2e (health)', () => {
     process.env.NODE_ENV = process.env.NODE_ENV || 'test';
     process.env.DATABASE_URL =
       process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/biometric_core?schema=public';
+      'postgresql://postgres:asalbaca@localhost:5433/biometric_core?schema=public';
     process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6380';
 
     const { AppModule } = await import('../src/app.module');

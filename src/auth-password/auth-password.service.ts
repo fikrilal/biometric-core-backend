@@ -39,13 +39,21 @@ export class AuthPasswordService {
         verificationRequestedAt: new Date(),
       },
     });
-    const tokens = await this.authTokens.issueTokensForUser(user);
-    const verificationToken = await this.pendingTokens.createEmailToken(
-      user.id,
-      24 * 60 * 60 * 1000,
-    );
-    await this.email.sendVerification(email, verificationToken);
-    return tokens;
+
+    try {
+      const tokens = await this.authTokens.issueTokensForUser(user);
+      const verificationToken = await this.pendingTokens.createEmailToken(
+        user.id,
+        24 * 60 * 60 * 1000,
+      );
+      await this.email.sendVerification(email, verificationToken);
+      return tokens;
+    } catch (err) {
+      // Prevent "half-registered" users (created but can't receive verification email).
+      // Delete user and cascade-delete dependent tokens so the client can retry cleanly.
+      await this.prisma.user.delete({ where: { id: user.id } }).catch(() => void 0);
+      throw err;
+    }
   }
 
   async login(dto: LoginDto, ip?: string) {

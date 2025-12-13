@@ -8,7 +8,8 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const req = ctx.getRequest<FastifyRequest>();
     const reply = ctx.getResponse<FastifyReply>();
 
-    const traceId: string | undefined = req.requestId || (req.headers['x-request-id'] as string | undefined);
+    const traceId: string | undefined =
+      req.requestId || (req.headers['x-request-id'] as string | undefined);
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let title = 'Internal Server Error';
@@ -23,7 +24,13 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       if (typeof resp === 'string') {
         title = resp;
       } else if (resp && typeof resp === 'object') {
-        const r = resp as { title?: string; message?: string; detail?: string; code?: string; type?: string };
+        const r = resp as {
+          title?: string;
+          message?: string;
+          detail?: string;
+          code?: string;
+          type?: string;
+        };
         title = r.title ?? this.statusTitle(status);
         detail = r.message ?? r.detail;
         code = r.code ?? code;
@@ -37,7 +44,29 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     }
 
     if (status >= 500) {
-      console.error('ProblemDetailsFilter exception', exception);
+      // Prefer request logger (nestjs-pino / fastify) so the real stack shows up next to the request log.
+      // Fallback to console.error if request logger isn't available.
+      const reqLogger = (
+        req as FastifyRequest & { log?: { error?: (obj: unknown, msg?: string) => void } }
+      ).log;
+      if (reqLogger?.error) {
+        reqLogger.error(
+          {
+            err: exception,
+            traceId,
+            method: req.method,
+            url: req.url,
+          },
+          'Unhandled exception',
+        );
+      } else {
+        console.error('ProblemDetailsFilter exception', {
+          traceId,
+          method: req.method,
+          url: req.url,
+          err: exception,
+        });
+      }
     }
 
     const problem: Record<string, unknown> = {

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server/esm/types';
+import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
 
 export class EnrollChallengeResponse {
   @ApiProperty()

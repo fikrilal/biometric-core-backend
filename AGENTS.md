@@ -31,14 +31,14 @@ biometric-core-backend/
 
 ## Build, Test, and Development Commands
 
-- Node version: use `nvm use` (Node 24 LTS). If needed: `nvm install 24`.
+- Node version: use `nvm use` (Node 22 LTS). If needed: `nvm install 22`.
 - After scaffold (package.json present):
   - `npm i` — install deps
   - `npm run start:dev` — run Nest (Fastify) in watch mode
   - `npm run test` / `npm run test:e2e` — run unit/e2e tests
   - `npm run build` — compile TypeScript to `dist/`
   - `npm run lint` / `npm run format` — lint and format code
-- Env: `cp .env.example .env` and edit values. Optional: `docker compose up -d` for Postgres/Redis when added.
+- Env: `cp env.example .env` and edit values. Optional: `docker compose up -d` for Postgres/Redis when added.
 
 ## Coding Style & Naming Conventions
 
@@ -81,16 +81,16 @@ See also: API response standard in `docs/standards/response-standard.md` and dev
 
 ## Security & Configuration Tips
 
-- Never commit secrets. Use `.env` + `.env.example`; store real secrets in a secret manager.
+- Never commit secrets. Use `.env` + `env.example`; store real secrets in a secret manager.
 - Validate env on boot; prefer least privilege for DB users.
 - Do not store raw biometric data; persist only necessary, privacy‑preserving artifacts.
 
 ## Tooling Tips (Node & WSL)
 
-- Standard Node: 24 LTS. Prefer running Node/NPM from Windows when developing inside WSL to avoid shim issues.
-- Install Node 24 on Windows
-  - nvm‑windows: `winget install CoreyButler.NVMforWindows` → `nvm install 24.11.0` → `nvm use 24.11.0`
-  - Or install Node 24 LTS MSI from nodejs.org.
+- Standard Node: 22 LTS. Prefer running Node/NPM from Windows when developing inside WSL to avoid shim issues.
+- Install Node 22 on Windows
+  - nvm‑windows: `winget install CoreyButler.NVMforWindows` → `nvm install 22.11.0` → `nvm use 22.11.0`
+  - Or install Node 22 LTS MSI from nodejs.org.
 - Use Windows Node/NPM from WSL (run in repo root)
   - Install deps: `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" ci`
   - Dev server: `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" run start:dev`
@@ -99,6 +99,6 @@ See also: API response standard in `docs/standards/response-standard.md` and dev
   - Tests (e2e): `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" run test:e2e --silent`
   - Build: `cmd.exe /C "%ProgramFiles%\nodejs\npm.cmd" run build`
 - Environment & services
-  - `cp .env.example .env` and set `REDIS_URL=redis://localhost:6380` (compose maps 6380→6379).
+  - `cp env.example .env` and set `REDIS_URL=redis://localhost:6380` (compose maps 6380→6379).
   - Start deps: `docker compose up -d`. Remove `version:` from compose to silence the warning.
 - If commands fail due to environment or permissions, don’t force execution—surface the error and request access/approval instead.
