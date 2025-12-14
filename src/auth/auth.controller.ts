@@ -5,7 +5,7 @@ import { BiometricChallengeDto } from './dto/biometric-challenge.dto';
 import { BiometricChallengeResponse } from './dto/biometric-challenge.response';
 import { BiometricVerifyDto } from './dto/biometric-verify.dto';
 import type { FastifyRequest } from 'fastify';
-import { AuthTokensResponse } from '../auth-password/dto/auth.response';
+import { AuthSessionResponse } from '../auth-password/dto/auth.response';
 import { StepUpChallengeDto } from './dto/step-up-challenge.dto';
 import { StepUpChallengeResponse } from './dto/step-up-challenge.response';
 import { StepUpVerifyDto } from './dto/step-up-verify.dto';
@@ -36,7 +36,7 @@ export class AuthController {
   @Post('verify')
   @HttpCode(200)
   @ApiOperation({ summary: 'Verify biometric authentication and issue tokens' })
-  verify(@Body() dto: BiometricVerifyDto): Promise<AuthTokensResponse> {
+  verify(@Body() dto: BiometricVerifyDto): Promise<AuthSessionResponse> {
     return this.authService.verifyBiometricLogin(dto);
   }
 

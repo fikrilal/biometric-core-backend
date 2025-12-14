@@ -36,7 +36,7 @@ Getting Started (Local)
   - WebAuthn config (for biometric flows):
     - `WEBAUTHN_RP_ID` – relying party ID (e.g., `localhost`, `app.example.com`); required in non‑test environments.
     - `WEBAUTHN_RP_NAME` – human‑readable app name shown in browser prompts (optional).
-    - `WEBAUTHN_ORIGINS` – comma‑separated list of allowed origins (e.g., `https://localhost:3000,https://app.example.com`); required in non‑test environments.
+    - `WEBAUTHN_ORIGINS` – comma‑separated list of allowed origins (e.g., `https://localhost:4000,https://app.example.com`); required in non‑test environments.
     - `WEBAUTHN_CHALLENGE_TTL_MS` – challenge lifetime in milliseconds (default `180000` / 3 minutes).
     - `WEBAUTHN_SIGNCOUNT_MODE` – `strict` or `lenient` signCount handling (default `strict`).
 - 2. Start dependencies
@@ -50,8 +50,8 @@ Getting Started (Local)
 - 5. Run the API in watch mode
   - `npm run start:dev`
 - 6. Verify
-  - Health: `http://localhost:3000/health` → `{ "status": "ok" }`
-  - Docs (Swagger UI): `http://localhost:3000/docs`
+  - Health: `http://localhost:4000/health` → `{ "status": "ok" }`
+  - Docs (Swagger UI): `http://localhost:4000/docs`
 
 Testing
 

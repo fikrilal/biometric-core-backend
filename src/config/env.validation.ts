@@ -16,10 +16,14 @@ class EnvVars {
   @IsEnum(NodeEnv)
   NODE_ENV!: NodeEnv;
 
-  @Transform(({ value }) => (value !== undefined ? Number(value) : 3000))
+  @IsOptional()
+  @IsString()
+  HOST?: string;
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 4000))
   @IsInt()
   @Min(0)
-  PORT: number = 3000;
+  PORT: number = 4000;
 
   @IsString()
   DATABASE_URL!: string;
@@ -68,7 +72,7 @@ class EnvVars {
   WEBAUTHN_RP_NAME?: string;
 
   /**
-   * Comma-separated list of allowed origins for WebAuthn (e.g. https://app.example.com,https://localhost:3000).
+   * Comma-separated list of allowed origins for WebAuthn (e.g. https://app.example.com,https://localhost:4000).
    */
   @IsOptional()
   @IsString()

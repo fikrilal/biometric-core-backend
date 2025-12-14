@@ -5,7 +5,7 @@ info:
   description: >-
     REST API for biometric enrollment, authentication, and device management.
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:4000
     description: Local development
 tags:
   - name: Health
@@ -316,12 +316,28 @@ components:
         stepUpToken: { type: string }
     AuthTokens:
       type: object
-      required: [accessToken, refreshToken, expiresIn, emailVerified]
+      required: [accessToken, refreshToken, expiresIn]
       properties:
         accessToken: { type: string }
         refreshToken: { type: string }
         expiresIn: { type: integer, format: int32, description: Access token expiration in seconds }
+
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, emailVerified]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
         emailVerified: { type: boolean, description: Whether the account email is verified }
+
+    AuthSession:
+      type: object
+      required: [tokens, user]
+      properties:
+        tokens: { $ref: '#/components/schemas/AuthTokens' }
+        user: { $ref: '#/components/schemas/AuthUser' }
 
     EnrollmentVerifyInput:
       type: object
@@ -404,16 +420,11 @@ components:
       properties:
         data: { $ref: '#/components/schemas/ChallengeResponse' }
 
-    EnvelopeAuthVerifyResponse:
+    EnvelopeAuthSession:
       type: object
       required: [data]
       properties:
-        data: { $ref: '#/components/schemas/AuthTokens' }
-    EnvelopeAuthTokens:
-      type: object
-      required: [data]
-      properties:
-        data: { $ref: '#/components/schemas/AuthTokens' }
+        data: { $ref: '#/components/schemas/AuthSession' }
     OperationResult:
       type: object
       required: [success]
@@ -498,7 +509,7 @@ paths:
           description: Authenticated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
@@ -665,6 +676,27 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EnvelopeUsers' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
+
+  /v1/users/me:
+    get:
+      tags: [Users]
+      summary: Get current user
+      operationId: getCurrentUser
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeUser' }
           headers:
             X-Request-Id:
               $ref: '#/components/headers/XRequestId'
@@ -900,7 +932,7 @@ paths:
           description: Registered
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/login:
@@ -923,7 +955,7 @@ paths:
           description: Authenticated
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/refresh:
@@ -945,7 +977,7 @@ paths:
           description: New tokens
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthTokens' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/logout:

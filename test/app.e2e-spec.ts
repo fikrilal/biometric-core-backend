@@ -46,7 +46,7 @@ async function loginUser(server: Parameters<typeof request>[0], email: string, p
     .post('/v1/auth/password/login')
     .send({ email, password })
     .expect(200);
-  return login.body.data.accessToken as string;
+  return login.body.data.tokens.accessToken as string;
 }
 
 function buildFakeRegistration(credentialId: string): RegistrationResponseJSON {
@@ -300,6 +300,27 @@ describe('App e2e (health)', () => {
     expect(getRes.body.data.lastName).toBe(lastName);
   });
 
+  it('users module supports /v1/users/me (current user)', async () => {
+    const server = getServer();
+    const email = `me-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    const firstName = 'Me';
+    const lastName = 'User';
+
+    await registerAndVerifyUser(server, { email, password, firstName, lastName });
+    const accessToken = await loginUser(server, email, password);
+
+    const res = await request(server)
+      .get('/v1/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(res.body.data.id).toBeDefined();
+    expect(res.body.data.email).toBe(email.toLowerCase());
+    expect(res.body.data.firstName).toBe(firstName);
+    expect(res.body.data.lastName).toBe(lastName);
+  });
+
   it('password auth flow (register/login/refresh/logout)', async () => {
     const server = getServer();
     const email = `auth-${Date.now()}@example.com`;
@@ -309,8 +330,8 @@ describe('App e2e (health)', () => {
       .post('/v1/auth/password/register')
       .send({ email, password, firstName: 'Auth', lastName: 'User' })
       .expect(201);
-    expect(register.body.data.accessToken).toBeDefined();
-    expect(register.body.data.refreshToken).toBeDefined();
+    expect(register.body.data.tokens.accessToken).toBeDefined();
+    expect(register.body.data.tokens.refreshToken).toBeDefined();
 
     // Verify email before login (required by the system)
     const verifyToken = MockEmailService.pullLatestVerificationToken(email);
@@ -324,17 +345,21 @@ describe('App e2e (health)', () => {
       .post('/v1/auth/password/login')
       .send({ email, password })
       .expect(200);
-    expect(login.body.data.accessToken).toBeDefined();
+    expect(login.body.data.tokens.accessToken).toBeDefined();
+    expect(login.body.data.user).toBeDefined();
+    expect(login.body.data.user.email).toBe(email.toLowerCase());
+    expect(login.body.data.user.firstName).toBe('Auth');
+    expect(login.body.data.user.lastName).toBe('User');
 
     const refresh = await request(server)
       .post('/v1/auth/password/refresh')
-      .send({ refreshToken: login.body.data.refreshToken })
+      .send({ refreshToken: login.body.data.tokens.refreshToken })
       .expect(200);
-    expect(refresh.body.data.accessToken).toBeDefined();
+    expect(refresh.body.data.tokens.accessToken).toBeDefined();
 
     await request(server)
       .post('/v1/auth/password/logout')
-      .send({ refreshToken: login.body.data.refreshToken })
+      .send({ refreshToken: login.body.data.tokens.refreshToken })
       .expect(200);
   });
 
@@ -348,7 +373,7 @@ describe('App e2e (health)', () => {
       .send({ email, password, firstName: 'Verify', lastName: 'User' })
       .expect(201);
 
-    expect(register.body.data.emailVerified).toBe(false);
+    expect(register.body.data.user.emailVerified).toBe(false);
 
     await request(server)
       .post('/v1/auth/password/login')
@@ -357,7 +382,7 @@ describe('App e2e (health)', () => {
 
     await request(server)
       .post('/v1/auth/password/refresh')
-      .send({ refreshToken: register.body.data.refreshToken })
+      .send({ refreshToken: register.body.data.tokens.refreshToken })
       .expect(403);
 
     const verifyToken = MockEmailService.pullLatestVerificationToken(email);
@@ -373,7 +398,7 @@ describe('App e2e (health)', () => {
       .send({ email, password })
       .expect(200);
 
-    expect(login.body.data.emailVerified).toBe(true);
+    expect(login.body.data.user.emailVerified).toBe(true);
   });
 
   it('supports password reset flow', async () => {
@@ -423,7 +448,7 @@ describe('App e2e (health)', () => {
       .send({ email, password: newPassword })
       .expect(200);
 
-    expect(loginNew.body.data.emailVerified).toBe(true);
+    expect(loginNew.body.data.user.emailVerified).toBe(true);
   });
 
   it('supports enrollment and biometric login flow (happy path with fake WebAuthn)', async () => {
@@ -451,7 +476,7 @@ describe('App e2e (health)', () => {
       .send({ email, password })
       .expect(200);
 
-    const accessToken: string = login.body.data.accessToken;
+    const accessToken: string = login.body.data.tokens.accessToken;
     expect(accessToken).toBeDefined();
 
     // Create enrollment challenge (requires JWT)
@@ -523,9 +548,9 @@ describe('App e2e (health)', () => {
       })
       .expect(200);
 
-    expect(authVerify.body.data.accessToken).toBeDefined();
-    expect(authVerify.body.data.refreshToken).toBeDefined();
-    expect(authVerify.body.data.emailVerified).toBe(true);
+    expect(authVerify.body.data.tokens.accessToken).toBeDefined();
+    expect(authVerify.body.data.tokens.refreshToken).toBeDefined();
+    expect(authVerify.body.data.user.emailVerified).toBe(true);
   });
 
   it('supports step-up biometric flow with fake WebAuthn', async () => {
@@ -539,7 +564,7 @@ describe('App e2e (health)', () => {
       .send({ email, password, firstName: 'Step', lastName: 'Up' })
       .expect(201);
 
-    expect(register.body.data.accessToken).toBeDefined();
+    expect(register.body.data.tokens.accessToken).toBeDefined();
 
     // Verify email
     const verifyToken = MockEmailService.pullLatestVerificationToken(email);
@@ -555,7 +580,7 @@ describe('App e2e (health)', () => {
       .send({ email, password })
       .expect(200);
 
-    const accessToken: string = login.body.data.accessToken;
+    const accessToken: string = login.body.data.tokens.accessToken;
     expect(accessToken).toBeDefined();
 
     // Enroll a device for the user
@@ -657,7 +682,7 @@ describe('App e2e (health)', () => {
       .post('/v1/auth/password/login')
       .send({ email, password })
       .expect(200);
-    const accessToken = login.body.data.accessToken as string;
+    const accessToken = login.body.data.tokens.accessToken as string;
     expect(typeof accessToken).toBe('string');
 
     const walletRes = await request(server)
@@ -709,8 +734,8 @@ describe('App e2e (health)', () => {
       .send({ email: recipientEmail, password })
       .expect(200);
 
-    const senderToken = senderLogin.body.data.accessToken as string;
-    const recipientToken = recipientLogin.body.data.accessToken as string;
+    const senderToken = senderLogin.body.data.tokens.accessToken as string;
+    const recipientToken = recipientLogin.body.data.tokens.accessToken as string;
 
     await request(server)
       .get('/v1/wallets/me')
