@@ -339,6 +339,12 @@ components:
         tokens: { $ref: '#/components/schemas/AuthTokens' }
         user: { $ref: '#/components/schemas/AuthUser' }
 
+    AuthRefresh:
+      type: object
+      required: [tokens]
+      properties:
+        tokens: { $ref: '#/components/schemas/AuthTokens' }
+
     EnrollmentVerifyInput:
       type: object
       required: [challengeId, credential]
@@ -425,6 +431,11 @@ components:
       required: [data]
       properties:
         data: { $ref: '#/components/schemas/AuthSession' }
+    EnvelopeAuthRefresh:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/AuthRefresh' }
     OperationResult:
       type: object
       required: [success]
@@ -977,7 +988,7 @@ paths:
           description: New tokens
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
+              schema: { $ref: '#/components/schemas/EnvelopeAuthRefresh' }
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/logout:

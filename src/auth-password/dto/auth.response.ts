@@ -35,3 +35,8 @@ export class AuthSessionResponse {
   @ApiProperty({ type: AuthUserResponse })
   user!: AuthUserResponse;
 }
+
+export class AuthRefreshResponse {
+  @ApiProperty({ type: AuthTokensResponse })
+  tokens!: AuthTokensResponse;
+}
