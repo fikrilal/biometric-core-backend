@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { WalletResponse } from './dto/wallet.response';
 import { PageQueryDto } from '../common/pagination/page-query.dto';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 @ApiTags('wallets')
 @Controller('wallets')
@@ -17,7 +19,7 @@ export class WalletsController {
   @ApiOperation({ summary: 'Get current user wallet' })
   getWallet(@CurrentUser() user: FastifyRequest['user']): Promise<WalletResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.wallets.getWalletView(user.userId);
   }
@@ -29,7 +31,7 @@ export class WalletsController {
     @Query() query: PageQueryDto,
   ) {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.wallets.getTransactionsForUser(user.userId, query.cursor, query.limit);
   }

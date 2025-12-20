@@ -51,6 +51,7 @@ This guide explains the core patterns used across the codebase so new features f
 - Source of truth: `docs/openapi/openapi.yaml` (3.1).
 - Lint: `npm run spec:lint` (Spectral).
 - Swagger UI is served at `/docs` from code-first decorators.
+- Error codes per endpoint: each operation should include `x-error-codes` listing the possible `code` values (see `docs/standards/error-codes.md`).
 
 ## Auth Password Module
 - Specs: `docs/features/auth-password.md`.

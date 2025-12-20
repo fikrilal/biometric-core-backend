@@ -12,6 +12,8 @@ import { StepUpVerifyDto } from './dto/step-up-verify.dto';
 import { StepUpVerifyResponse } from './dto/step-up-verify.response';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -50,7 +52,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
   ): Promise<StepUpChallengeResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.authService.createStepUpChallenge(user.userId, dto, req.ip);
   }
@@ -64,7 +66,7 @@ export class AuthController {
     @Body() dto: StepUpVerifyDto,
   ): Promise<StepUpVerifyResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.authService.verifyStepUp(user.userId, dto);
   }

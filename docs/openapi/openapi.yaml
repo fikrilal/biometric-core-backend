@@ -361,9 +361,11 @@ components:
 
     CreateUserInput:
       type: object
-      required: [email]
+      required: [email, firstName, lastName]
       properties:
         email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
 
     EnvelopeUser:
       type: object
@@ -456,6 +458,8 @@ paths:
       tags: [Health]
       summary: Liveness check
       operationId: getHealth
+      x-error-codes:
+        - INTERNAL
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       responses:
@@ -480,6 +484,12 @@ paths:
       tags: [Auth]
       summary: Create authentication challenge (WebAuthn assertion)
       operationId: authCreateChallenge
+      x-error-codes:
+        - VALIDATION_FAILED
+        - NOT_FOUND
+        - EMAIL_NOT_VERIFIED
+        - NO_CREDENTIALS
+        - RATE_LIMITED
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       requestBody:
@@ -505,6 +515,13 @@ paths:
       tags: [Auth]
       summary: Verify authentication assertion and issue tokens
       operationId: authVerify
+      x-error-codes:
+        - VALIDATION_FAILED
+        - NOT_FOUND
+        - EMAIL_NOT_VERIFIED
+        - UNAUTHORIZED
+        - CREDENTIAL_COMPROMISED
+        - INTERNAL
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       requestBody:
@@ -529,6 +546,13 @@ paths:
       tags: [Enrollment]
       summary: Create enrollment challenge (WebAuthn attestation)
       operationId: enrollCreateChallenge
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - NOT_FOUND
+        - EMAIL_NOT_VERIFIED
+        - RATE_LIMITED
+        - IDEMPOTENCY_IN_PROGRESS
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -558,6 +582,13 @@ paths:
       tags: [Auth]
       summary: Create step-up authentication challenge
       operationId: authStepUpCreateChallenge
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - NOT_FOUND
+        - EMAIL_NOT_VERIFIED
+        - NO_CREDENTIALS
+        - RATE_LIMITED
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       requestBody:
@@ -584,6 +615,14 @@ paths:
       tags: [Auth]
       summary: Verify step-up authentication and issue token
       operationId: authStepUpVerify
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - CHALLENGE_EXPIRED
+        - NOT_FOUND
+        - EMAIL_NOT_VERIFIED
+        - CREDENTIAL_COMPROMISED
+        - INTERNAL
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       requestBody:
@@ -614,6 +653,13 @@ paths:
       tags: [Enrollment]
       summary: Verify enrollment attestation and store credential
       operationId: enrollVerify
+      x-error-codes:
+        - VALIDATION_FAILED
+        - CHALLENGE_EXPIRED
+        - NOT_FOUND
+        - CONFLICT
+        - INTERNAL
+        - IDEMPOTENCY_IN_PROGRESS
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -641,6 +687,10 @@ paths:
       tags: [Users]
       summary: Create a user
       operationId: createUser
+      x-error-codes:
+        - VALIDATION_FAILED
+        - CONFLICT
+        - IDEMPOTENCY_IN_PROGRESS
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -667,13 +717,13 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         default:
           $ref: '#/components/responses/Problem'
-      security:
-        - bearerAuth: []
 
     get:
       tags: [Users]
       summary: List users (cursor pagination)
       operationId: listUsers
+      x-error-codes:
+        - VALIDATION_FAILED
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/Cursor'
@@ -689,14 +739,15 @@ paths:
               $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
-      security:
-        - bearerAuth: []
 
   /v1/users/me:
     get:
       tags: [Users]
       summary: Get current user
       operationId: getCurrentUser
+      x-error-codes:
+        - UNAUTHORIZED
+        - NOT_FOUND
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       responses:
@@ -718,6 +769,8 @@ paths:
       tags: [Users]
       summary: Get a user by id
       operationId: getUser
+      x-error-codes:
+        - NOT_FOUND
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - name: id
@@ -740,14 +793,14 @@ paths:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
         default:
           $ref: '#/components/responses/Problem'
-      security:
-        - bearerAuth: []
 
   /v1/wallets/me:
     get:
       tags: [Wallets]
       summary: Get current user's wallet
       operationId: getCurrentWallet
+      x-error-codes:
+        - UNAUTHORIZED
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       responses:
@@ -769,6 +822,9 @@ paths:
       tags: [Wallets]
       summary: List wallet transactions for current user
       operationId: listCurrentWalletTransactions
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/Cursor'
@@ -792,6 +848,17 @@ paths:
       tags: [Transactions]
       summary: Create wallet transfer
       operationId: createTransfer
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - FORBIDDEN
+        - RECIPIENT_NOT_FOUND
+        - SAME_WALLET_TRANSFER
+        - WALLET_BLOCKED
+        - LIMIT_EXCEEDED
+        - INSUFFICIENT_FUNDS
+        - CONFLICT
+        - IDEMPOTENCY_IN_PROGRESS
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -822,6 +889,9 @@ paths:
       tags: [Transactions]
       summary: Get transfer by id
       operationId: getTransfer
+      x-error-codes:
+        - UNAUTHORIZED
+        - NOT_FOUND
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - name: id
@@ -847,6 +917,10 @@ paths:
       tags: [Transactions]
       summary: Resolve recipient identifier
       operationId: resolveRecipient
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - NOT_FOUND
       parameters:
         - $ref: '#/components/parameters/XRequestId'
       requestBody:
@@ -873,6 +947,9 @@ paths:
       tags: [Devices]
       summary: List devices for current user
       operationId: listDevices
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/Cursor'
@@ -896,6 +973,10 @@ paths:
       tags: [Devices]
       summary: Revoke a device by id
       operationId: revokeDevice
+      x-error-codes:
+        - UNAUTHORIZED
+        - NOT_FOUND
+        - IDEMPOTENCY_IN_PROGRESS
       parameters:
         - $ref: '#/components/parameters/XRequestId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -923,6 +1004,13 @@ paths:
       tags: [Auth]
       summary: Register with email/password
       operationId: passwordRegister
+      x-error-codes:
+        - VALIDATION_FAILED
+        - CONFLICT
+        - INTERNAL
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -948,6 +1036,13 @@ paths:
       tags: [Auth]
       summary: Login with email/password
       operationId: passwordLogin
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - EMAIL_NOT_VERIFIED
+        - RATE_LIMITED
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:
@@ -971,6 +1066,13 @@ paths:
       tags: [Auth]
       summary: Rotate refresh token
       operationId: passwordRefresh
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - EMAIL_NOT_VERIFIED
+        - RATE_LIMITED
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:
@@ -993,6 +1095,10 @@ paths:
       tags: [Auth]
       summary: Logout/revoke refresh token
       operationId: passwordLogout
+      x-error-codes:
+        - VALIDATION_FAILED
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:
@@ -1011,6 +1117,11 @@ paths:
       tags: [Auth]
       summary: Send verification email
       operationId: passwordVerifyRequest
+      x-error-codes:
+        - VALIDATION_FAILED
+        - INTERNAL
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:
@@ -1033,6 +1144,10 @@ paths:
       tags: [Auth]
       summary: Confirm email verification token
       operationId: passwordVerifyConfirm
+      x-error-codes:
+        - VALIDATION_FAILED
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:
@@ -1055,6 +1170,11 @@ paths:
       tags: [Auth]
       summary: Send password reset email
       operationId: passwordResetRequest
+      x-error-codes:
+        - VALIDATION_FAILED
+        - INTERNAL
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:
@@ -1077,6 +1197,11 @@ paths:
       tags: [Auth]
       summary: Confirm password reset
       operationId: passwordResetConfirm
+      x-error-codes:
+        - VALIDATION_FAILED
+        - NOT_FOUND
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
       requestBody:
         required: true
         content:

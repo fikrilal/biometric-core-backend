@@ -7,6 +7,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { TransferResponse } from './dto/transfer.response';
 import { ResolveRecipientDto, ResolveRecipientResponse } from './dto/resolve-recipient.dto';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 @ApiTags('Transactions')
 @Controller('transactions')
@@ -23,7 +25,7 @@ export class TransactionsController {
     @Req() req?: FastifyRequest,
   ): Promise<TransferResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.transactions.createTransfer(
       user.userId,
@@ -40,7 +42,7 @@ export class TransactionsController {
     @Param('id') id: string,
   ): Promise<TransferResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.transactions.getTransactionForUser(user.userId, id);
   }

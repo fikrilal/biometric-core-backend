@@ -4,6 +4,8 @@ This backend uses RFC 7807-style “Problem Details” for error responses and a
 
 Source of truth for codes: `src/common/errors/error-codes.ts`.
 
+OpenAPI convention: every operation should list its expected `code` values in `x-error-codes` within `docs/openapi/openapi.yaml`.
+
 ## Error Response Shape
 
 All non-2xx responses should be returned as `application/problem+json`:
@@ -22,6 +24,7 @@ All non-2xx responses should be returned as `application/problem+json`:
 - `code` is the primary machine-readable signal for clients.
 - `detail` is optional and must not leak sensitive information.
 - `traceId` matches `X-Request-Id`.
+- `INTERNAL` may occur on any endpoint (unexpected failures); clients should handle it generically.
 
 ## Error Code Catalog
 
@@ -130,4 +133,3 @@ Notes:
    - Add it to `src/common/errors/error-codes.ts`.
    - Document it in this file.
    - Update `docs/openapi/openapi.yaml` endpoint docs to include it (either in descriptions or via a consistent extension like `x-error-codes`).
-
