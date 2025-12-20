@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import { ErrorCode } from '../../errors/error-codes';
 
 @Catch()
 export class ProblemDetailsFilter implements ExceptionFilter {
@@ -43,6 +44,10 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       detail = exception.message;
     }
 
+    if (!code) {
+      code = this.defaultCode(status);
+    }
+
     if (status >= 500) {
       // Prefer request logger (nestjs-pino / fastify) so the real stack shows up next to the request log.
       // Fallback to console.error if request logger isn't available.
@@ -83,6 +88,28 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     reply.header('Content-Type', 'application/problem+json');
 
     reply.status(status).send(problem);
+  }
+
+  private defaultCode(status: number): ErrorCode {
+    if (status >= 500) return ErrorCode.INTERNAL;
+
+    switch (status) {
+      case HttpStatus.BAD_REQUEST:
+      case HttpStatus.UNPROCESSABLE_ENTITY:
+        return ErrorCode.VALIDATION_FAILED;
+      case HttpStatus.UNAUTHORIZED:
+        return ErrorCode.UNAUTHORIZED;
+      case HttpStatus.FORBIDDEN:
+        return ErrorCode.FORBIDDEN;
+      case HttpStatus.NOT_FOUND:
+        return ErrorCode.NOT_FOUND;
+      case HttpStatus.CONFLICT:
+        return ErrorCode.CONFLICT;
+      case HttpStatus.TOO_MANY_REQUESTS:
+        return ErrorCode.RATE_LIMITED;
+      default:
+        return ErrorCode.VALIDATION_FAILED;
+    }
   }
 
   private statusTitle(status: number): string {

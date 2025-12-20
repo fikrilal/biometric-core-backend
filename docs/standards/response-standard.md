@@ -14,6 +14,7 @@ This document defines consistent response shapes, headers, and status codes for 
 - Content type: `application/problem+json`.
 - Shape: `{ type, title, status, detail?, instance?, code, traceId }`.
 - Always include `traceId` (the `X-Request-Id` value) and a stable `code` for programmatic handling.
+- Error codes catalog: `docs/standards/error-codes.md`.
 
 ## Headers
 
@@ -54,4 +55,3 @@ This document defines consistent response shapes, headers, and status codes for 
 - A global response interceptor will wrap controller returns into the envelope; opt-out with a `@SkipEnvelope` decorator when necessary.
 - A global exception filter will produce RFC 7807 with `traceId`.
 - Keep DTOs clean; the envelope is applied at the transport layer.
-

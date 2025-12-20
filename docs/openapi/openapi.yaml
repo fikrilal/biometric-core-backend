@@ -84,7 +84,7 @@ components:
         limit: { type: integer, minimum: 1, maximum: 250 }
     ProblemDetails:
       type: object
-      required: [type, title, status, traceId]
+      required: [type, title, status, code, traceId]
       properties:
         type: { type: string, description: A URI reference that identifies the problem type }
         title: { type: string }

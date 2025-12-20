@@ -54,6 +54,7 @@ See also: API response standard in `docs/standards/response-standard.md` and dev
 - Envelope: controllers return plain DTOs; interceptor wraps as `{ data, meta? }`.
 - Skip envelope: add `@SkipEnvelope()` for endpoints like `/health` or streams.
 - Errors: throw `ProblemException.*` with `ErrorCode` for RFC 7807 bodies.
+- Error codes: keep `docs/standards/error-codes.md` and `docs/openapi/openapi.yaml` updated when adding/changing errors or endpoints.
 - Idempotency: POST/DELETE honor `Idempotency-Key`; replays return `Idempotency-Replayed: true`.
 - Pagination: accept `PageQueryDto` and return `toPaginated(items, nextCursor?, limit?)`; envelope adds `{ data, meta }`.
 - Versioning: all routes under `/v1` (except `/health`).

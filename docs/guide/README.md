@@ -19,6 +19,7 @@ This guide explains the core patterns used across the codebase so new features f
 - Errors are returned as `application/problem+json` with `traceId`.
 - Use `ProblemException` (prefer) or Nest `HttpException`—both map to RFC 7807.
 - Error codes live in `ErrorCode` enum for stability.
+- Error codes catalog (including per-endpoint mappings): `docs/standards/error-codes.md`.
 - 404 for unknown routes is handled globally.
 - Code references:
   - Filter: `src/common/http/filters/problem-details.filter.ts`
