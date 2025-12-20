@@ -9,6 +9,7 @@ import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDesc
 import { WebauthnSignCountMode } from '../src/config/env.validation';
 import { TokenService } from '../src/auth-password/token.service';
 import { PrismaClient } from '@prisma/client';
+import * as fs from 'fs';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -18,6 +19,24 @@ import type {
 } from '@simplewebauthn/server/esm/types';
 
 const prisma = new PrismaClient();
+
+function resolveDefaultRedisUrlForTests() {
+  if (process.env.REDIS_URL) return process.env.REDIS_URL;
+  const fallback = 'redis://localhost:6380';
+  if (process.platform !== 'linux') return fallback;
+  try {
+    const osRelease = fs.readFileSync('/proc/sys/kernel/osrelease', 'utf8');
+    const isWsl = /microsoft/i.test(osRelease);
+    if (!isWsl) return fallback;
+    const resolvConf = fs.readFileSync('/etc/resolv.conf', 'utf8');
+    const match = resolvConf.match(/^nameserver\s+(\S+)/m);
+    const windowsHost = match?.[1];
+    if (!windowsHost) return fallback;
+    return `redis://${windowsHost}:6380`;
+  } catch {
+    return fallback;
+  }
+}
 
 async function registerAndVerifyUser(
   server: Parameters<typeof request>[0],
@@ -206,7 +225,7 @@ describe('App e2e (health)', () => {
     process.env.DATABASE_URL =
       process.env.DATABASE_URL ||
       'postgresql://postgres:asalbaca@localhost:5433/biometric_core?schema=public';
-    process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6380';
+    process.env.REDIS_URL = resolveDefaultRedisUrlForTests();
 
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({

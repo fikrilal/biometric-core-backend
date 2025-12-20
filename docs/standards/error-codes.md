@@ -31,7 +31,9 @@ All non-2xx responses should be returned as `application/problem+json`:
 | Code | Meaning (client-facing) |
 | --- | --- |
 | `VALIDATION_FAILED` | Request payload/query/header is invalid (DTO validation, malformed input, business validation). |
-| `UNAUTHORIZED` | Missing/invalid credentials (Bearer token, password, refresh token, step-up token). |
+| `UNAUTHORIZED` | Missing/invalid credentials (generic). Prefer a more specific auth code when available. |
+| `INVALID_CREDENTIALS` | Email/password credentials are invalid. |
+| `INVALID_REFRESH_TOKEN` | Refresh token is invalid, expired, revoked, or malformed. |
 | `FORBIDDEN` | Authenticated but not allowed for this action (policy/purpose mismatch). |
 | `NOT_FOUND` | Requested resource does not exist or is not accessible. |
 | `CONFLICT` | Resource conflict (uniqueness, idempotency mismatch, already exists). |
@@ -60,9 +62,9 @@ Notes:
 - `POST /v1/auth/password/register`
   - `VALIDATION_FAILED`, `CONFLICT`, `INTERNAL` (email provider failures)
 - `POST /v1/auth/password/login`
-  - `VALIDATION_FAILED`, `UNAUTHORIZED`, `EMAIL_NOT_VERIFIED`, `RATE_LIMITED`
+  - `VALIDATION_FAILED`, `INVALID_CREDENTIALS`, `EMAIL_NOT_VERIFIED`, `RATE_LIMITED`
 - `POST /v1/auth/password/refresh`
-  - `VALIDATION_FAILED`, `UNAUTHORIZED`, `EMAIL_NOT_VERIFIED`, `RATE_LIMITED`
+  - `VALIDATION_FAILED`, `INVALID_REFRESH_TOKEN`, `EMAIL_NOT_VERIFIED`, `RATE_LIMITED`
 - `POST /v1/auth/password/logout`
   - `VALIDATION_FAILED`
 - `POST /v1/auth/password/verify/request`

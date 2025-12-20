@@ -67,7 +67,7 @@ export class AuthPasswordService {
     if (!user || !user.passwordHash || !(await argon2.verify(user.passwordHash, dto.password))) {
       throw new ProblemException(401, {
         title: 'Invalid credentials',
-        code: ErrorCode.UNAUTHORIZED,
+        code: ErrorCode.INVALID_CREDENTIALS,
       });
     }
     if (!user.emailVerified) {
@@ -90,7 +90,7 @@ export class AuthPasswordService {
     const payload = await this.tokens.verifyRefreshToken(dto.refreshToken).catch(() => {
       throw new ProblemException(401, {
         title: 'Invalid refresh token',
-        code: ErrorCode.UNAUTHORIZED,
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
       });
     });
     const tokenId = payload.jti as string;
@@ -99,14 +99,14 @@ export class AuthPasswordService {
     if (!record || record.revoked || record.userId !== userId) {
       throw new ProblemException(401, {
         title: 'Invalid refresh token',
-        code: ErrorCode.UNAUTHORIZED,
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
       });
     }
     const valid = await argon2.verify(record.tokenHash, dto.refreshToken).catch(() => false);
     if (!valid) {
       throw new ProblemException(401, {
         title: 'Invalid refresh token',
-        code: ErrorCode.UNAUTHORIZED,
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
       });
     }
     await this.prisma.refreshToken.update({ where: { id: tokenId }, data: { revoked: true } });
@@ -114,7 +114,7 @@ export class AuthPasswordService {
     if (!user) {
       throw new ProblemException(401, {
         title: 'Invalid refresh token',
-        code: ErrorCode.UNAUTHORIZED,
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
       });
     }
     if (!user.emailVerified) {

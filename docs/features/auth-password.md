@@ -31,7 +31,8 @@ Biometric login requires an existing account. This module provides initial regis
 
 ## Errors
 - 400: invalid input (`code: VALIDATION_FAILED`)
-- 401: bad credentials (`code: UNAUTHORIZED`)
+- 401: bad credentials (`code: INVALID_CREDENTIALS`)
+- 401: invalid refresh token (`code: INVALID_REFRESH_TOKEN`)
 - 409: email already exists (`code: CONFLICT`)
 
 ## Headers

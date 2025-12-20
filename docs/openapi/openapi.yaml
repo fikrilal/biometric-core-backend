@@ -1038,7 +1038,7 @@ paths:
       operationId: passwordLogin
       x-error-codes:
         - VALIDATION_FAILED
-        - UNAUTHORIZED
+        - INVALID_CREDENTIALS
         - EMAIL_NOT_VERIFIED
         - RATE_LIMITED
       parameters:
@@ -1068,7 +1068,7 @@ paths:
       operationId: passwordRefresh
       x-error-codes:
         - VALIDATION_FAILED
-        - UNAUTHORIZED
+        - INVALID_REFRESH_TOKEN
         - EMAIL_NOT_VERIFIED
         - RATE_LIMITED
       parameters:
