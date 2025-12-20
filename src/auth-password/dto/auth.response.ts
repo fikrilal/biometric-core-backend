@@ -37,6 +37,12 @@ export class AuthSessionResponse {
 }
 
 export class AuthRefreshResponse {
-  @ApiProperty({ type: AuthTokensResponse })
-  tokens!: AuthTokensResponse;
+  @ApiProperty()
+  accessToken!: string;
+
+  @ApiProperty()
+  refreshToken!: string;
+
+  @ApiProperty({ description: 'Access token TTL in seconds' })
+  expiresIn!: number;
 }

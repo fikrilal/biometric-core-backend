@@ -340,10 +340,7 @@ components:
         user: { $ref: '#/components/schemas/AuthUser' }
 
     AuthRefresh:
-      type: object
-      required: [tokens]
-      properties:
-        tokens: { $ref: '#/components/schemas/AuthTokens' }
+      $ref: '#/components/schemas/AuthTokens'
 
     EnrollmentVerifyInput:
       type: object

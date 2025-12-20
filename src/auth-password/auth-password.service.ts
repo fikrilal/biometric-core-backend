@@ -125,7 +125,7 @@ export class AuthPasswordService {
       });
     }
     const tokens = await this.authTokens.issueTokensForUser(user);
-    return { tokens };
+    return tokens;
   }
 
   async logout(dto: RefreshDto) {

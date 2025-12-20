@@ -355,7 +355,9 @@ describe('App e2e (health)', () => {
       .post('/v1/auth/password/refresh')
       .send({ refreshToken: login.body.data.tokens.refreshToken })
       .expect(200);
-    expect(refresh.body.data.tokens.accessToken).toBeDefined();
+    expect(refresh.body.data.accessToken).toBeDefined();
+    expect(refresh.body.data.refreshToken).toBeDefined();
+    expect(refresh.body.data.expiresIn).toBeDefined();
 
     await request(server)
       .post('/v1/auth/password/logout')
