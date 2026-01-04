@@ -28,6 +28,7 @@ This document defines consistent response shapes, headers, and status codes for 
 
 - GET (single/list): `200` with `{ data, meta? }`.
 - POST (create): `201` with `{ data }` and `Location`; if replay via Idempotency-Key, return `200` with `Idempotency-Replayed: true`.
+- POST (command/no resource): `204` No Content (no body).
 - PUT/PATCH: `200` with `{ data }`.
 - DELETE: `204` No Content (no body).
 - Async operations (if any): `202` with `{ data: { jobId } }`.

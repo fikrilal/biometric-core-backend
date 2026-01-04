@@ -57,7 +57,7 @@ async function registerAndVerifyUser(
   await request(server)
     .post('/v1/auth/password/verify/confirm')
     .send({ token: verifyToken })
-    .expect(200);
+    .expect(204);
 }
 
 async function loginUser(server: Parameters<typeof request>[0], email: string, password: string) {
@@ -358,7 +358,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     const login = await request(server)
       .post('/v1/auth/password/login')
@@ -381,7 +381,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/logout')
       .send({ refreshToken: login.body.data.tokens.refreshToken })
-      .expect(200);
+      .expect(204);
   });
 
   it('requires email verification before login/refresh', async () => {
@@ -412,7 +412,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     const login = await request(server)
       .post('/v1/auth/password/login')
@@ -438,7 +438,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     await request(server)
       .post('/v1/auth/password/login')
@@ -448,7 +448,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/reset/request')
       .send({ email })
-      .expect(200);
+      .expect(204);
 
     const resetToken = MockEmailService.pullLatestResetToken(email);
     expect(resetToken).toBeDefined();
@@ -457,7 +457,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/reset/confirm')
       .send({ token: resetToken, newPassword })
-      .expect(200);
+      .expect(204);
 
     await request(server)
       .post('/v1/auth/password/login')
@@ -489,7 +489,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     // Login with password to get access token
     const login = await request(server)
@@ -593,7 +593,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     // Login with password to get access token
     const login = await request(server)
@@ -697,7 +697,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     const login = await request(server)
       .post('/v1/auth/password/login')
@@ -740,11 +740,11 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: senderVerify })
-      .expect(200);
+      .expect(204);
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: recipientVerify })
-      .expect(200);
+      .expect(204);
 
     const senderLogin = await request(server)
       .post('/v1/auth/password/login')

@@ -74,4 +74,5 @@ This guide explains the core patterns used across the codebase so new features f
 - Accept `PageQueryDto` for lists; return `toPaginated(...)`.
 - Throw `ProblemException.*` for errors; include stable `ErrorCode`.
 - Respect `Idempotency-Key` on POST/DELETE (interceptor is global).
+- Use `204 No Content` for command-style endpoints that return no resource.
 - Add Swagger decorators to document the route; ensure OpenAPI stays aligned.

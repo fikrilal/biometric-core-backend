@@ -435,16 +435,6 @@ components:
       required: [data]
       properties:
         data: { $ref: '#/components/schemas/AuthRefresh' }
-    OperationResult:
-      type: object
-      required: [success]
-      properties:
-        success: { type: boolean }
-    EnvelopeOperationResult:
-      type: object
-      required: [data]
-      properties:
-        data: { $ref: '#/components/schemas/OperationResult' }
 
     EnvelopeEnrollmentVerifyResponse:
       type: object
@@ -1109,7 +1099,11 @@ paths:
               properties:
                 refreshToken: { type: string }
       responses:
-        '200': { description: OK }
+        '204':
+          description: No Content
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/verify/request:
@@ -1132,11 +1126,11 @@ paths:
               properties:
                 email: { type: string, format: email }
       responses:
-        '200':
-          description: Sent
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        '204':
+          description: No Content
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/verify/confirm:
@@ -1158,11 +1152,11 @@ paths:
               properties:
                 token: { type: string }
       responses:
-        '200':
-          description: Verified
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        '204':
+          description: No Content
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/reset/request:
@@ -1185,11 +1179,11 @@ paths:
               properties:
                 email: { type: string, format: email }
       responses:
-        '200':
-          description: Sent
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        '204':
+          description: No Content
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
   /v1/auth/password/reset/confirm:
@@ -1213,10 +1207,10 @@ paths:
                 token: { type: string }
                 newPassword: { type: string, minLength: 8 }
       responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/EnvelopeOperationResult' }
+        '204':
+          description: No Content
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'

@@ -130,23 +130,23 @@ export class AuthPasswordService {
 
   async logout(dto: RefreshDto) {
     const payload = await this.tokens.verifyRefreshToken(dto.refreshToken).catch(() => null);
-    if (!payload) return { success: true };
+    if (!payload) return;
     const tokenId = payload.jti as string;
     await this.prisma.refreshToken.updateMany({ where: { id: tokenId }, data: { revoked: true } });
-    return { success: true };
+    return;
   }
 
   async requestVerification(rawEmail: string) {
     const email = this.normalizeEmail(rawEmail);
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) return { success: true };
+    if (!user) return;
     const token = await this.pendingTokens.createEmailToken(user.id, 24 * 60 * 60 * 1000);
     await this.prisma.user.update({
       where: { id: user.id },
       data: { verificationRequestedAt: new Date() },
     });
     await this.email.sendVerification(email, token);
-    return { success: true };
+    return;
   }
 
   async confirmVerification(token: string) {
@@ -161,16 +161,16 @@ export class AuthPasswordService {
       where: { id: userId },
       data: { emailVerified: true, verificationRequestedAt: null },
     });
-    return { success: true };
+    return;
   }
 
   async requestPasswordReset(rawEmail: string) {
     const email = this.normalizeEmail(rawEmail);
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) return { success: true };
+    if (!user) return;
     const token = await this.pendingTokens.createResetToken(user.id, 30 * 60 * 1000);
     await this.email.sendPasswordReset(email, token);
-    return { success: true };
+    return;
   }
 
   async confirmPasswordReset(token: string, newPassword: string) {
@@ -189,7 +189,7 @@ export class AuthPasswordService {
       where: { userId: user.id },
       data: { revoked: true },
     });
-    return { success: true };
+    return;
   }
 
   private buildKey(type: string, identifier: string, ip?: string) {

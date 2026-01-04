@@ -38,37 +38,37 @@ export class AuthPasswordController {
   }
 
   @Post('logout')
-  @HttpCode(200)
+  @HttpCode(204)
   @ApiOperation({ summary: 'Revoke refresh token' })
-  logout(@Body() dto: RefreshDto) {
-    return this.service.logout(dto);
+  async logout(@Body() dto: RefreshDto): Promise<void> {
+    await this.service.logout(dto);
   }
 
   @Post('verify/request')
-  @HttpCode(200)
+  @HttpCode(204)
   @ApiOperation({ summary: 'Send verification email' })
-  verifyRequest(@Body() dto: VerifyRequestDto) {
-    return this.service.requestVerification(dto.email);
+  async verifyRequest(@Body() dto: VerifyRequestDto): Promise<void> {
+    await this.service.requestVerification(dto.email);
   }
 
   @Post('verify/confirm')
-  @HttpCode(200)
+  @HttpCode(204)
   @ApiOperation({ summary: 'Confirm verification token' })
-  verifyConfirm(@Body() dto: VerifyConfirmDto) {
-    return this.service.confirmVerification(dto.token);
+  async verifyConfirm(@Body() dto: VerifyConfirmDto): Promise<void> {
+    await this.service.confirmVerification(dto.token);
   }
 
   @Post('reset/request')
-  @HttpCode(200)
+  @HttpCode(204)
   @ApiOperation({ summary: 'Send password reset email' })
-  resetRequest(@Body() dto: ResetRequestDto) {
-    return this.service.requestPasswordReset(dto.email);
+  async resetRequest(@Body() dto: ResetRequestDto): Promise<void> {
+    await this.service.requestPasswordReset(dto.email);
   }
 
   @Post('reset/confirm')
-  @HttpCode(200)
+  @HttpCode(204)
   @ApiOperation({ summary: 'Confirm password reset' })
-  resetConfirm(@Body() dto: ResetConfirmDto) {
-    return this.service.confirmPasswordReset(dto.token, dto.newPassword);
+  async resetConfirm(@Body() dto: ResetConfirmDto): Promise<void> {
+    await this.service.confirmPasswordReset(dto.token, dto.newPassword);
   }
 }
