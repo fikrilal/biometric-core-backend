@@ -6,6 +6,9 @@ info:
     REST API for biometric enrollment, authentication, and device management.
   contact:
     name: Biometric Core API Support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
 servers:
   - url: http://localhost:4000
     description: Local development
