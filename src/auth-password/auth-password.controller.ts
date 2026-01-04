@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Post, Res, Req } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiNoContent, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthPasswordService } from './auth-password.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -40,6 +40,7 @@ export class AuthPasswordController {
   @Post('logout')
   @HttpCode(204)
   @ApiOperation({ summary: 'Revoke refresh token' })
+  @ApiNoContent({ description: 'No Content' })
   async logout(@Body() dto: RefreshDto): Promise<void> {
     await this.service.logout(dto);
   }
@@ -47,6 +48,7 @@ export class AuthPasswordController {
   @Post('verify/request')
   @HttpCode(204)
   @ApiOperation({ summary: 'Send verification email' })
+  @ApiNoContent({ description: 'No Content' })
   async verifyRequest(@Body() dto: VerifyRequestDto): Promise<void> {
     await this.service.requestVerification(dto.email);
   }
@@ -54,6 +56,7 @@ export class AuthPasswordController {
   @Post('verify/confirm')
   @HttpCode(204)
   @ApiOperation({ summary: 'Confirm verification token' })
+  @ApiNoContent({ description: 'No Content' })
   async verifyConfirm(@Body() dto: VerifyConfirmDto): Promise<void> {
     await this.service.confirmVerification(dto.token);
   }
@@ -61,6 +64,7 @@ export class AuthPasswordController {
   @Post('reset/request')
   @HttpCode(204)
   @ApiOperation({ summary: 'Send password reset email' })
+  @ApiNoContent({ description: 'No Content' })
   async resetRequest(@Body() dto: ResetRequestDto): Promise<void> {
     await this.service.requestPasswordReset(dto.email);
   }
@@ -68,6 +72,7 @@ export class AuthPasswordController {
   @Post('reset/confirm')
   @HttpCode(204)
   @ApiOperation({ summary: 'Confirm password reset' })
+  @ApiNoContent({ description: 'No Content' })
   async resetConfirm(@Body() dto: ResetConfirmDto): Promise<void> {
     await this.service.confirmPasswordReset(dto.token, dto.newPassword);
   }

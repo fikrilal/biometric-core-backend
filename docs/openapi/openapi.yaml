@@ -4,6 +4,8 @@ info:
   version: 0.1.0
   description: >-
     REST API for biometric enrollment, authentication, and device management.
+  contact:
+    name: Biometric Core API Support
 servers:
   - url: http://localhost:4000
     description: Local development
@@ -447,6 +449,7 @@ paths:
     get:
       tags: [Health]
       summary: Liveness check
+      description: Returns a basic liveness signal to verify the service is running.
       operationId: getHealth
       x-error-codes:
         - INTERNAL
@@ -473,6 +476,7 @@ paths:
     post:
       tags: [Auth]
       summary: Create authentication challenge (WebAuthn assertion)
+      description: Creates a WebAuthn assertion challenge for a user identified by email or userId.
       operationId: authCreateChallenge
       x-error-codes:
         - VALIDATION_FAILED
@@ -504,6 +508,7 @@ paths:
     post:
       tags: [Auth]
       summary: Verify authentication assertion and issue tokens
+      description: Verifies the WebAuthn assertion response and issues access/refresh tokens.
       operationId: authVerify
       x-error-codes:
         - VALIDATION_FAILED
@@ -535,6 +540,7 @@ paths:
     post:
       tags: [Enrollment]
       summary: Create enrollment challenge (WebAuthn attestation)
+      description: Creates WebAuthn registration options to enroll a new device for the authenticated user.
       operationId: enrollCreateChallenge
       x-error-codes:
         - VALIDATION_FAILED
@@ -571,6 +577,7 @@ paths:
     post:
       tags: [Auth]
       summary: Create step-up authentication challenge
+      description: Creates a WebAuthn assertion challenge for step-up authentication for the authenticated user.
       operationId: authStepUpCreateChallenge
       x-error-codes:
         - VALIDATION_FAILED
@@ -604,6 +611,7 @@ paths:
     post:
       tags: [Auth]
       summary: Verify step-up authentication and issue token
+      description: Verifies the step-up WebAuthn assertion and returns a short-lived step-up token.
       operationId: authStepUpVerify
       x-error-codes:
         - VALIDATION_FAILED
@@ -642,6 +650,7 @@ paths:
     post:
       tags: [Enrollment]
       summary: Verify enrollment attestation and store credential
+      description: Verifies the WebAuthn attestation response and stores the resulting credential and device metadata.
       operationId: enrollVerify
       x-error-codes:
         - VALIDATION_FAILED
@@ -676,6 +685,7 @@ paths:
     post:
       tags: [Users]
       summary: Create a user
+      description: Creates a new user record.
       operationId: createUser
       x-error-codes:
         - VALIDATION_FAILED
@@ -711,6 +721,7 @@ paths:
     get:
       tags: [Users]
       summary: List users (cursor pagination)
+      description: Lists users using cursor-based pagination.
       operationId: listUsers
       x-error-codes:
         - VALIDATION_FAILED
@@ -734,6 +745,7 @@ paths:
     get:
       tags: [Users]
       summary: Get current user
+      description: Returns the currently authenticated user.
       operationId: getCurrentUser
       x-error-codes:
         - UNAUTHORIZED
@@ -758,6 +770,7 @@ paths:
     get:
       tags: [Users]
       summary: Get a user by id
+      description: Returns a single user by id.
       operationId: getUser
       x-error-codes:
         - NOT_FOUND
@@ -788,6 +801,7 @@ paths:
     get:
       tags: [Wallets]
       summary: Get current user's wallet
+      description: Returns the authenticated user's wallet summary and limits.
       operationId: getCurrentWallet
       x-error-codes:
         - UNAUTHORIZED
@@ -811,6 +825,7 @@ paths:
     get:
       tags: [Wallets]
       summary: List wallet transactions for current user
+      description: Lists wallet transactions for the authenticated user using cursor-based pagination.
       operationId: listCurrentWalletTransactions
       x-error-codes:
         - VALIDATION_FAILED
@@ -837,6 +852,7 @@ paths:
     post:
       tags: [Transactions]
       summary: Create wallet transfer
+      description: Creates a wallet-to-wallet transfer; high-value transfers may require an `X-Step-Up-Token`.
       operationId: createTransfer
       x-error-codes:
         - VALIDATION_FAILED
@@ -878,6 +894,7 @@ paths:
     get:
       tags: [Transactions]
       summary: Get transfer by id
+      description: Returns a transfer by id.
       operationId: getTransfer
       x-error-codes:
         - UNAUTHORIZED
@@ -906,6 +923,7 @@ paths:
     post:
       tags: [Transactions]
       summary: Resolve recipient identifier
+      description: Resolves a recipient identifier (e.g., email) into a recipient record for transfers.
       operationId: resolveRecipient
       x-error-codes:
         - VALIDATION_FAILED
@@ -936,6 +954,7 @@ paths:
     get:
       tags: [Devices]
       summary: List devices for current user
+      description: Lists active devices for the authenticated user.
       operationId: listDevices
       x-error-codes:
         - VALIDATION_FAILED
@@ -962,6 +981,7 @@ paths:
     delete:
       tags: [Devices]
       summary: Revoke a device by id
+      description: Revokes (deactivates) a device for the authenticated user.
       operationId: revokeDevice
       x-error-codes:
         - UNAUTHORIZED
@@ -993,6 +1013,7 @@ paths:
     post:
       tags: [Auth]
       summary: Register with email/password
+      description: Registers a new user with email/password and sends a verification email.
       operationId: passwordRegister
       x-error-codes:
         - VALIDATION_FAILED
@@ -1025,6 +1046,7 @@ paths:
     post:
       tags: [Auth]
       summary: Login with email/password
+      description: Authenticates a user with email/password and returns a token session (requires verified email).
       operationId: passwordLogin
       x-error-codes:
         - VALIDATION_FAILED
@@ -1055,6 +1077,7 @@ paths:
     post:
       tags: [Auth]
       summary: Rotate refresh token
+      description: Rotates the refresh token and returns a new token pair.
       operationId: passwordRefresh
       x-error-codes:
         - VALIDATION_FAILED
@@ -1084,6 +1107,7 @@ paths:
     post:
       tags: [Auth]
       summary: Logout/revoke refresh token
+      description: Revokes the provided refresh token.
       operationId: passwordLogout
       x-error-codes:
         - VALIDATION_FAILED
@@ -1110,6 +1134,7 @@ paths:
     post:
       tags: [Auth]
       summary: Send verification email
+      description: Sends an email verification message (no-op if the email is unknown).
       operationId: passwordVerifyRequest
       x-error-codes:
         - VALIDATION_FAILED
@@ -1137,6 +1162,7 @@ paths:
     post:
       tags: [Auth]
       summary: Confirm email verification token
+      description: Confirms an email verification token and marks the user's email as verified.
       operationId: passwordVerifyConfirm
       x-error-codes:
         - VALIDATION_FAILED
@@ -1163,6 +1189,7 @@ paths:
     post:
       tags: [Auth]
       summary: Send password reset email
+      description: Sends a password reset message (no-op if the email is unknown).
       operationId: passwordResetRequest
       x-error-codes:
         - VALIDATION_FAILED
@@ -1190,6 +1217,7 @@ paths:
     post:
       tags: [Auth]
       summary: Confirm password reset
+      description: Confirms a password reset token and updates the user's password.
       operationId: passwordResetConfirm
       x-error-codes:
         - VALIDATION_FAILED
