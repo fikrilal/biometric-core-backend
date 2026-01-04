@@ -10,6 +10,7 @@ import { WebauthnSignCountMode } from '../src/config/env.validation';
 import { TokenService } from '../src/auth-password/token.service';
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
+import { GoogleOidcService } from '../src/auth-google/google-oidc.service';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -208,6 +209,46 @@ class FakeWebAuthnService {
   }
 }
 
+class FakeGoogleOidcService {
+  async verifyIdToken(idToken: string) {
+    if (idToken === 'google:new') {
+      return {
+        sub: `google-sub-${Date.now()}`,
+        email: `google-${Date.now()}@example.com`,
+        email_verified: true,
+        given_name: 'Google',
+        family_name: 'User',
+      };
+    }
+
+    const existingMatch = idToken.match(/^google:existing:(.+)$/);
+    if (existingMatch) {
+      const email = existingMatch[1];
+      return {
+        sub: `google-sub-existing:${email}`,
+        email,
+        email_verified: true,
+        given_name: 'Existing',
+        family_name: 'User',
+      };
+    }
+
+    const otherMatch = idToken.match(/^google:other:(.+)$/);
+    if (otherMatch) {
+      const email = otherMatch[1];
+      return {
+        sub: `google-sub-other:${email}`,
+        email,
+        email_verified: true,
+        given_name: 'Other',
+        family_name: 'User',
+      };
+    }
+
+    throw new Error('invalid token');
+  }
+}
+
 describe('App e2e (health)', () => {
   console.log('TEST DATABASE_URL', process.env.DATABASE_URL);
   let app: INestApplication;
@@ -233,6 +274,8 @@ describe('App e2e (health)', () => {
     })
       .overrideProvider(WebAuthnService)
       .useClass(FakeWebAuthnService)
+      .overrideProvider(GoogleOidcService)
+      .useClass(FakeGoogleOidcService)
       .compile();
 
     app = await moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
@@ -251,7 +294,9 @@ describe('App e2e (health)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
     await prisma.$disconnect();
   });
 
@@ -870,6 +915,70 @@ describe('App e2e (health)', () => {
 
     expect(transfer.body.data.stepUpUsed).toBe(true);
     expect(transfer.body.data.amountMinor).toBe(6_000_000);
+  });
+
+  it('supports Google login/register and connect flow', async () => {
+    const server = getServer();
+
+    // Register/login with Google should create a new user and return session tokens
+    const googleAuth = await request(server)
+      .post('/v1/auth/google')
+      .send({ idToken: 'google:new' })
+      .expect(200);
+
+    expect(googleAuth.body.data.tokens.accessToken).toBeDefined();
+    expect(googleAuth.body.data.tokens.refreshToken).toBeDefined();
+    expect(googleAuth.body.data.user.email).toMatch(/@example\.com$/);
+    expect(googleAuth.body.data.user.emailVerified).toBe(true);
+
+    // Create a password user, then connect Google (email must match)
+    const email = `existing-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    await registerAndVerifyUser(server, {
+      email,
+      password,
+      firstName: 'Existing',
+      lastName: 'User',
+    });
+    const accessToken = await loginUser(server, email, password);
+
+    await request(server)
+      .post('/v1/auth/google/connect')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ idToken: `google:existing:${email}` })
+      .expect(204);
+
+    // After connecting, Google auth should log in to the same user (by provider link)
+    const googleAuthAgain = await request(server)
+      .post('/v1/auth/google')
+      .send({ idToken: `google:existing:${email}` })
+      .expect(200);
+    expect(googleAuthAgain.body.data.user.email).toBe(email.toLowerCase());
+
+    // Connecting a Google account already linked to another user should conflict
+    const otherEmail = `other-${Date.now()}@example.com`;
+    await registerAndVerifyUser(server, {
+      email: otherEmail,
+      password,
+      firstName: 'Other',
+      lastName: 'User',
+    });
+    const otherAccess = await loginUser(server, otherEmail, password);
+
+    // First connect "google:other-user" to the other user (ok)
+    await request(server)
+      .post('/v1/auth/google/connect')
+      .set('Authorization', `Bearer ${otherAccess}`)
+      .send({ idToken: `google:other:${otherEmail}` })
+      .expect(204);
+
+    // Then attempt to connect the same Google account to the original user -> 409
+    const conflict = await request(server)
+      .post('/v1/auth/google/connect')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ idToken: `google:other:${otherEmail}` })
+      .expect(403);
+    expect(conflict.body.code).toBe(ErrorCode.FORBIDDEN);
   });
 
   it('rejects transfers that violate funds, limits, or missing recipients', async () => {

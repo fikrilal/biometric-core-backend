@@ -1245,3 +1245,74 @@ paths:
               $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
+
+  /v1/auth/google:
+    post:
+      tags: [Auth]
+      summary: Login or register with Google
+      description: Verifies a Google ID token and issues a token session; creates a new user when no matching account exists.
+      operationId: googleAuthenticate
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - EMAIL_NOT_VERIFIED
+        - CONFLICT
+        - INTERNAL
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken: { type: string, description: Google ID token (OIDC) }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security: []
+
+  /v1/auth/google/connect:
+    post:
+      tags: [Auth]
+      summary: Connect Google account
+      description: Links a Google account to the currently authenticated user (email must match).
+      operationId: googleConnect
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - FORBIDDEN
+        - EMAIL_NOT_VERIFIED
+        - CONFLICT
+        - INTERNAL
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken: { type: string, description: Google ID token (OIDC) }
+      responses:
+        '204':
+          description: No Content
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []

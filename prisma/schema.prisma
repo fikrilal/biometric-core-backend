@@ -19,9 +19,29 @@ model User {
   refreshTokens RefreshToken[]
   emailTokens EmailVerificationToken[]
   resetTokens PasswordResetToken[]
+  authProviderAccounts AuthProviderAccount[]
   credentials Credential[]
   devices     Device[]
   wallet      Wallet?
+}
+
+enum AuthProvider {
+  GOOGLE
+}
+
+model AuthProviderAccount {
+  id                String       @id @default(cuid())
+  userId            String
+  provider          AuthProvider
+  providerAccountId String
+  email             String?
+  createdAt         DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([email])
 }
 
 model RefreshToken {

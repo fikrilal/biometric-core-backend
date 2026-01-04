@@ -76,6 +76,13 @@ Notes:
 - `POST /v1/auth/password/reset/confirm`
   - `VALIDATION_FAILED`, `NOT_FOUND`
 
+### Auth: Google (`/v1/auth/google*`)
+
+- `POST /v1/auth/google`
+  - `VALIDATION_FAILED`, `UNAUTHORIZED`, `EMAIL_NOT_VERIFIED`, `CONFLICT`
+- `POST /v1/auth/google/connect`
+  - `VALIDATION_FAILED`, `UNAUTHORIZED`, `FORBIDDEN`, `EMAIL_NOT_VERIFIED`, `CONFLICT`
+
 ### Auth: WebAuthn (`/v1/auth/*`)
 
 - `POST /v1/auth/challenge`
