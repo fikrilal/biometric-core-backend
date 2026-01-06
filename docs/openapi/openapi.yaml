@@ -1250,11 +1250,12 @@ paths:
     post:
       tags: [Auth]
       summary: Login or register with Google
-      description: Verifies a Google ID token and issues a token session; creates a new user when no matching account exists.
+      description: Verifies a Firebase ID token (Google provider) and issues a token session; creates a new user when no matching account exists.
       operationId: googleAuthenticate
       x-error-codes:
         - VALIDATION_FAILED
         - UNAUTHORIZED
+        - FORBIDDEN
         - EMAIL_NOT_VERIFIED
         - CONFLICT
         - INTERNAL
@@ -1268,7 +1269,7 @@ paths:
               type: object
               required: [idToken]
               properties:
-                idToken: { type: string, description: Google ID token (OIDC) }
+                idToken: { type: string, description: Firebase ID token (Google provider) }
       responses:
         '200':
           description: Authenticated
@@ -1286,7 +1287,7 @@ paths:
     post:
       tags: [Auth]
       summary: Connect Google account
-      description: Links a Google account to the currently authenticated user (email must match).
+      description: Links a Google account to the currently authenticated user using a Firebase ID token (email must match).
       operationId: googleConnect
       x-error-codes:
         - VALIDATION_FAILED
@@ -1305,7 +1306,7 @@ paths:
               type: object
               required: [idToken]
               properties:
-                idToken: { type: string, description: Google ID token (OIDC) }
+                idToken: { type: string, description: Firebase ID token (Google provider) }
       responses:
         '204':
           description: No Content

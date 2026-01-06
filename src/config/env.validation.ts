@@ -61,8 +61,14 @@ class EnvVars {
   @IsString()
   PASSWORD_RESET_URL?: string;
 
-  // Google OIDC (social login)
-  // Comma-separated list of allowed Google OAuth client IDs (audiences) for ID token verification.
+  // Firebase Auth (Google login)
+  // Firebase project id used to verify Firebase ID tokens (aud / issuer) at /v1/auth/google.
+  @IsOptional()
+  @IsString()
+  FIREBASE_PROJECT_ID?: string;
+
+  // Deprecated: Google OIDC (previous social login implementation)
+  // Comma-separated list of allowed Google OAuth client IDs (audiences) for Google OIDC ID token verification.
   @IsOptional()
   @IsString()
   GOOGLE_OIDC_CLIENT_IDS?: string;

@@ -3,23 +3,27 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthTokensService } from '../auth-password/auth-tokens.service';
 import { ProblemException } from '../common/errors/problem.exception';
 import { ErrorCode } from '../common/errors/error-codes';
-import { GoogleOidcMisconfiguredError, GoogleOidcService } from './google-oidc.service';
+import {
+  FirebaseAuthMisconfiguredError,
+  FirebaseAuthService,
+  type FirebaseIdTokenClaims,
+} from './firebase-auth.service';
 import { AuthProvider } from '@prisma/client';
 
 @Injectable()
 export class AuthGoogleService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly google: GoogleOidcService,
+    private readonly firebase: FirebaseAuthService,
     private readonly authTokens: AuthTokensService,
   ) {}
 
   async authenticate(idToken: string) {
-    let claims;
+    let claims: FirebaseIdTokenClaims;
     try {
-      claims = await this.google.verifyIdToken(idToken);
+      claims = await this.firebase.verifyIdToken(idToken);
     } catch (err) {
-      if (err instanceof GoogleOidcMisconfiguredError) {
+      if (err instanceof FirebaseAuthMisconfiguredError) {
         throw new ProblemException(500, {
           title: 'Google login is not configured',
           code: ErrorCode.INTERNAL,
@@ -28,6 +32,15 @@ export class AuthGoogleService {
       throw new ProblemException(401, {
         title: 'Invalid Google token',
         code: ErrorCode.UNAUTHORIZED,
+      });
+    }
+
+    const signInProvider = claims.firebase?.sign_in_provider;
+    if (signInProvider !== 'google.com') {
+      throw new ProblemException(403, {
+        title: 'Forbidden',
+        detail: 'Firebase token must be issued via Google Sign-In (google.com).',
+        code: ErrorCode.FORBIDDEN,
       });
     }
 
@@ -69,8 +82,8 @@ export class AuthGoogleService {
       (await this.findOrCreateUserAndLink({
         email,
         providerAccountId,
-        firstName: claims.given_name ?? undefined,
-        lastName: claims.family_name ?? undefined,
+        firstName: this.extractFirstName(claims.name),
+        lastName: this.extractLastName(claims.name),
       }));
 
     const tokens = await this.authTokens.issueTokensForUser(user);
@@ -78,11 +91,11 @@ export class AuthGoogleService {
   }
 
   async connect(userId: string, idToken: string): Promise<void> {
-    let claims;
+    let claims: FirebaseIdTokenClaims;
     try {
-      claims = await this.google.verifyIdToken(idToken);
+      claims = await this.firebase.verifyIdToken(idToken);
     } catch (err) {
-      if (err instanceof GoogleOidcMisconfiguredError) {
+      if (err instanceof FirebaseAuthMisconfiguredError) {
         throw new ProblemException(500, {
           title: 'Google login is not configured',
           code: ErrorCode.INTERNAL,
@@ -91,6 +104,15 @@ export class AuthGoogleService {
       throw new ProblemException(401, {
         title: 'Invalid Google token',
         code: ErrorCode.UNAUTHORIZED,
+      });
+    }
+
+    const signInProvider = claims.firebase?.sign_in_provider;
+    if (signInProvider !== 'google.com') {
+      throw new ProblemException(403, {
+        title: 'Forbidden',
+        detail: 'Firebase token must be issued via Google Sign-In (google.com).',
+        code: ErrorCode.FORBIDDEN,
       });
     }
 
@@ -139,7 +161,11 @@ export class AuthGoogleService {
     });
 
     if (alreadyLinked && alreadyLinked.userId !== userId) {
-      throw ProblemException.conflict('Google account is already linked to another user');
+      throw new ProblemException(403, {
+        title: 'Forbidden',
+        detail: 'Google account cannot be linked to this user.',
+        code: ErrorCode.FORBIDDEN,
+      });
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -215,6 +241,19 @@ export class AuthGoogleService {
   private normalizeEmail(value?: string) {
     const email = (value ?? '').trim().toLowerCase();
     return email || null;
+  }
+
+  private extractFirstName(fullName?: string) {
+    const raw = (fullName ?? '').trim();
+    if (!raw) return undefined;
+    return raw.split(/\s+/).slice(0, 1).join(' ');
+  }
+
+  private extractLastName(fullName?: string) {
+    const raw = (fullName ?? '').trim();
+    if (!raw) return undefined;
+    const parts = raw.split(/\s+/);
+    return parts.length > 1 ? parts.slice(1).join(' ') : undefined;
   }
 
   private toUserResponse(user: {

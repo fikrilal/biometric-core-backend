@@ -5,12 +5,16 @@ import * as request from 'supertest';
 import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
 import { ErrorCode } from '../src/common/errors/error-codes';
-import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
+import {
+  WebAuthnService,
+  type WebAuthnExistingCredential,
+  type WebAuthnUserDescriptor,
+} from '../src/webauthn/webauthn.service';
 import { WebauthnSignCountMode } from '../src/config/env.validation';
 import { TokenService } from '../src/auth-password/token.service';
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
-import { GoogleOidcService } from '../src/auth-google/google-oidc.service';
+import { FirebaseAuthService } from '../src/auth-google/firebase-auth.service';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -172,10 +176,7 @@ class FakeWebAuthnService {
     };
   }
 
-  async verifyRegistration(
-    response: RegistrationResponseJSON,
-    _expectedChallenge: string,
-  ) {
+  async verifyRegistration(response: RegistrationResponseJSON, _expectedChallenge: string) {
     // In tests we trust the wiring and ignore the actual challenge value.
     // Always treat the response as a valid registration.
     return {
@@ -209,15 +210,15 @@ class FakeWebAuthnService {
   }
 }
 
-class FakeGoogleOidcService {
+class FakeFirebaseAuthService {
   async verifyIdToken(idToken: string) {
     if (idToken === 'google:new') {
       return {
         sub: `google-sub-${Date.now()}`,
         email: `google-${Date.now()}@example.com`,
         email_verified: true,
-        given_name: 'Google',
-        family_name: 'User',
+        name: 'Google User',
+        firebase: { sign_in_provider: 'google.com' },
       };
     }
 
@@ -228,8 +229,8 @@ class FakeGoogleOidcService {
         sub: `google-sub-existing:${email}`,
         email,
         email_verified: true,
-        given_name: 'Existing',
-        family_name: 'User',
+        name: 'Existing User',
+        firebase: { sign_in_provider: 'google.com' },
       };
     }
 
@@ -240,8 +241,8 @@ class FakeGoogleOidcService {
         sub: `google-sub-other:${email}`,
         email,
         email_verified: true,
-        given_name: 'Other',
-        family_name: 'User',
+        name: 'Other User',
+        firebase: { sign_in_provider: 'google.com' },
       };
     }
 
@@ -274,8 +275,8 @@ describe('App e2e (health)', () => {
     })
       .overrideProvider(WebAuthnService)
       .useClass(FakeWebAuthnService)
-      .overrideProvider(GoogleOidcService)
-      .useClass(FakeGoogleOidcService)
+      .overrideProvider(FirebaseAuthService)
+      .useClass(FakeFirebaseAuthService)
       .compile();
 
     app = await moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
@@ -306,18 +307,18 @@ describe('App e2e (health)', () => {
 
   it('/health (GET)', async () => {
     const server = getServer();
-    await request(server).get('/health').expect(200).expect(({ body }) => {
-      expect(body.status).toBe('ok');
-    });
+    await request(server)
+      .get('/health')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.status).toBe('ok');
+      });
   });
 
   it('/v1/auth/ping (GET) returns envelope and echoes X-Request-Id', async () => {
     const server = getServer();
     const reqId = 'e2e-test-req-1';
-    const res = await request(server)
-      .get('/v1/auth/ping')
-      .set('X-Request-Id', reqId)
-      .expect(200);
+    const res = await request(server).get('/v1/auth/ping').set('X-Request-Id', reqId).expect(200);
 
     expect(res.headers['x-request-id']).toBe(reqId);
     expect(res.body).toEqual({ data: { ok: true } });
@@ -351,9 +352,7 @@ describe('App e2e (health)', () => {
     expect(createRes.body.data.lastName).toBe(lastName);
     const userId = createRes.body.data.id;
 
-    const listRes = await request(server)
-      .get('/v1/users?limit=1')
-      .expect(200);
+    const listRes = await request(server).get('/v1/users?limit=1').expect(200);
     expect(Array.isArray(listRes.body.data)).toBe(true);
     expect(listRes.body.meta).toHaveProperty('limit');
 
@@ -441,10 +440,7 @@ describe('App e2e (health)', () => {
 
     expect(register.body.data.user.emailVerified).toBe(false);
 
-    await request(server)
-      .post('/v1/auth/password/login')
-      .send({ email, password })
-      .expect(403);
+    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(403);
 
     await request(server)
       .post('/v1/auth/password/refresh')
@@ -485,15 +481,9 @@ describe('App e2e (health)', () => {
       .send({ token: verifyToken })
       .expect(204);
 
-    await request(server)
-      .post('/v1/auth/password/login')
-      .send({ email, password })
-      .expect(200);
+    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(200);
 
-    await request(server)
-      .post('/v1/auth/password/reset/request')
-      .send({ email })
-      .expect(204);
+    await request(server).post('/v1/auth/password/reset/request').send({ email }).expect(204);
 
     const resetToken = MockEmailService.pullLatestResetToken(email);
     expect(resetToken).toBeDefined();
@@ -504,10 +494,7 @@ describe('App e2e (health)', () => {
       .send({ token: resetToken, newPassword })
       .expect(204);
 
-    await request(server)
-      .post('/v1/auth/password/login')
-      .send({ email, password })
-      .expect(401);
+    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(401);
 
     const loginNew = await request(server)
       .post('/v1/auth/password/login')
