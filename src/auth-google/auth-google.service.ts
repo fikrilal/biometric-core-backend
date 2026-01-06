@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthTokensService } from '../auth-password/auth-tokens.service';
 import { ProblemException } from '../common/errors/problem.exception';
 import { ErrorCode } from '../common/errors/error-codes';
-import { GoogleOidcService } from './google-oidc.service';
+import { GoogleOidcMisconfiguredError, GoogleOidcService } from './google-oidc.service';
 import { AuthProvider } from '@prisma/client';
 
 @Injectable()
@@ -15,12 +15,21 @@ export class AuthGoogleService {
   ) {}
 
   async authenticate(idToken: string) {
-    const claims = await this.google.verifyIdToken(idToken).catch(() => {
+    let claims;
+    try {
+      claims = await this.google.verifyIdToken(idToken);
+    } catch (err) {
+      if (err instanceof GoogleOidcMisconfiguredError) {
+        throw new ProblemException(500, {
+          title: 'Google login is not configured',
+          code: ErrorCode.INTERNAL,
+        });
+      }
       throw new ProblemException(401, {
         title: 'Invalid Google token',
         code: ErrorCode.UNAUTHORIZED,
       });
-    });
+    }
 
     const providerAccountId = claims.sub;
     if (!providerAccountId) {
@@ -69,12 +78,21 @@ export class AuthGoogleService {
   }
 
   async connect(userId: string, idToken: string): Promise<void> {
-    const claims = await this.google.verifyIdToken(idToken).catch(() => {
+    let claims;
+    try {
+      claims = await this.google.verifyIdToken(idToken);
+    } catch (err) {
+      if (err instanceof GoogleOidcMisconfiguredError) {
+        throw new ProblemException(500, {
+          title: 'Google login is not configured',
+          code: ErrorCode.INTERNAL,
+        });
+      }
       throw new ProblemException(401, {
         title: 'Invalid Google token',
         code: ErrorCode.UNAUTHORIZED,
       });
-    });
+    }
 
     const providerAccountId = claims.sub;
     if (!providerAccountId) {
@@ -215,4 +233,3 @@ export class AuthGoogleService {
     };
   }
 }
-

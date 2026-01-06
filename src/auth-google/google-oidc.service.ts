@@ -14,6 +14,13 @@ export interface GoogleIdTokenClaims extends JWTPayload {
   picture?: string;
 }
 
+export class GoogleOidcMisconfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GoogleOidcMisconfiguredError';
+  }
+}
+
 @Injectable()
 export class GoogleOidcService {
   private readonly jwks = createRemoteJWKSet(
@@ -30,7 +37,7 @@ export class GoogleOidcService {
       .filter(Boolean);
 
     if (audiences.length === 0) {
-      throw new Error('GOOGLE_OIDC_CLIENT_IDS is not configured');
+      throw new GoogleOidcMisconfiguredError('GOOGLE_OIDC_CLIENT_IDS is not configured');
     }
 
     const { payload } = await jwtVerify(idToken, this.jwks, {

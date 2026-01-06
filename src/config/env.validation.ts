@@ -61,6 +61,12 @@ class EnvVars {
   @IsString()
   PASSWORD_RESET_URL?: string;
 
+  // Google OIDC (social login)
+  // Comma-separated list of allowed Google OAuth client IDs (audiences) for ID token verification.
+  @IsOptional()
+  @IsString()
+  GOOGLE_OIDC_CLIENT_IDS?: string;
+
   // WebAuthn / Biometric configuration
 
   @IsOptional()

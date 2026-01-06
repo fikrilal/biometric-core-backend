@@ -76,7 +76,7 @@ git push heroku main
 The `Procfile` defines two processes:
 
 - **web**: Runs the production server (`npm run start:prod`)
-- **release**: Runs Prisma migrations before each deployment (`npx prisma migrate deploy`)
+- **release**: Runs Prisma migrations before each deployment (`npm run prisma:migrate:deploy`)
 
 ### Build Process
 
