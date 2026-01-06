@@ -6,6 +6,7 @@ import Redis from 'ioredis';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private readonly client: Redis;
+  private lastClientError: Error | undefined;
 
   constructor(config: ConfigService) {
     const url = config.getOrThrow<string>('REDIS_URL');
@@ -26,13 +27,22 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.client.on('error', (error) => {
+      if (error instanceof Error) {
+        this.lastClientError = error;
+      }
       this.logger.error({ err: error }, 'Redis client error');
     });
   }
 
   async onModuleInit() {
-    if (this.client.status === 'wait') {
+    if (this.client.status !== 'wait') return;
+    try {
       await this.client.connect();
+    } catch (error) {
+      const lastErrorMessage = this.lastClientError?.message;
+      const suffix = lastErrorMessage ? ` (last error: ${lastErrorMessage})` : '';
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Redis connect failed: ${message}${suffix}`);
     }
   }
 
