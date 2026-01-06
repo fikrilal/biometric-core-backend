@@ -49,6 +49,10 @@ heroku config:set WEBAUTHN_ORIGINS="https://your-domain.com"
 heroku config:set WEBAUTHN_CHALLENGE_TTL_MS=180000
 heroku config:set WEBAUTHN_SIGNCOUNT_MODE=strict
 
+# Redis TLS (Heroku Redis commonly uses TLS; some environments require disabling cert verification)
+# Prefer supplying a proper CA when possible; this flag is explicit and scoped to Redis only.
+heroku config:set REDIS_TLS_REJECT_UNAUTHORIZED=false
+
 # Email (optional - uses mock logger if not set)
 heroku config:set RESEND_API_KEY="your-resend-api-key"
 heroku config:set EMAIL_FROM_ADDRESS="Your App <no-reply@your-domain.com>"

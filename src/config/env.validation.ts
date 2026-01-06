@@ -1,5 +1,5 @@
 import { plainToInstance, Transform } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min, validateSync } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min, validateSync } from 'class-validator';
 
 export enum NodeEnv {
   Development = 'development',
@@ -30,6 +30,17 @@ class EnvVars {
 
   @IsString()
   REDIS_URL!: string;
+
+  @Transform(({ value }) => {
+    if (value === undefined) return true;
+    if (typeof value === 'boolean') return value;
+    const raw = String(value).trim().toLowerCase();
+    if (raw === 'true' || raw === '1') return true;
+    if (raw === 'false' || raw === '0') return false;
+    return Boolean(raw);
+  })
+  @IsBoolean()
+  REDIS_TLS_REJECT_UNAUTHORIZED: boolean = true;
 
   @IsString()
   AUTH_JWT_ACCESS_SECRET!: string;
