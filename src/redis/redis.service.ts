@@ -9,7 +9,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(config: ConfigService) {
     const url = config.getOrThrow<string>('REDIS_URL');
-    const tlsRejectUnauthorized = config.get<boolean>('REDIS_TLS_REJECT_UNAUTHORIZED') ?? true;
+    const tlsRejectUnauthorizedRaw = config.get('REDIS_TLS_REJECT_UNAUTHORIZED');
+    const tlsRejectUnauthorized =
+      tlsRejectUnauthorizedRaw === undefined
+        ? true
+        : typeof tlsRejectUnauthorizedRaw === 'boolean'
+          ? tlsRejectUnauthorizedRaw
+          : !['false', '0', ''].includes(String(tlsRejectUnauthorizedRaw).trim().toLowerCase());
     const isTls = url.trim().toLowerCase().startsWith('rediss://');
 
     this.client = new Redis(url, {
