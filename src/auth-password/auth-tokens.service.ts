@@ -7,7 +7,6 @@ import { randomUUID } from 'crypto';
 
 export interface AuthTokenUser {
   id: string;
-  emailVerified: boolean;
 }
 
 @Injectable()
@@ -36,7 +35,6 @@ export class AuthTokensService {
       accessToken: access.token,
       refreshToken: refresh.token,
       expiresIn: access.expiresIn,
-      emailVerified: user.emailVerified,
     };
   }
 }

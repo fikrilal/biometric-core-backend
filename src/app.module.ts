@@ -18,6 +18,7 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
 import { DevicesModule } from './devices/devices.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { AuthGoogleModule } from './auth-google/auth-google.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     DevicesModule,
     WalletsModule,
     TransactionsModule,
+    AuthGoogleModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },

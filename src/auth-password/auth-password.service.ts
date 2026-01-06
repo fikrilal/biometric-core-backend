@@ -39,13 +39,21 @@ export class AuthPasswordService {
         verificationRequestedAt: new Date(),
       },
     });
-    const tokens = await this.authTokens.issueTokensForUser(user);
-    const verificationToken = await this.pendingTokens.createEmailToken(
-      user.id,
-      24 * 60 * 60 * 1000,
-    );
-    await this.email.sendVerification(email, verificationToken);
-    return tokens;
+
+    try {
+      const tokens = await this.authTokens.issueTokensForUser(user);
+      const verificationToken = await this.pendingTokens.createEmailToken(
+        user.id,
+        24 * 60 * 60 * 1000,
+      );
+      await this.email.sendVerification(email, verificationToken);
+      return { tokens, user: this.toUserResponse(user) };
+    } catch (err) {
+      // Prevent "half-registered" users (created but can't receive verification email).
+      // Delete user and cascade-delete dependent tokens so the client can retry cleanly.
+      await this.prisma.user.delete({ where: { id: user.id } }).catch(() => void 0);
+      throw err;
+    }
   }
 
   async login(dto: LoginDto, ip?: string) {
@@ -57,7 +65,10 @@ export class AuthPasswordService {
     });
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || !user.passwordHash || !(await argon2.verify(user.passwordHash, dto.password))) {
-      throw new ProblemException(401, { title: 'Invalid credentials', code: ErrorCode.UNAUTHORIZED });
+      throw new ProblemException(401, {
+        title: 'Invalid credentials',
+        code: ErrorCode.INVALID_CREDENTIALS,
+      });
     }
     if (!user.emailVerified) {
       throw new ProblemException(403, {
@@ -66,7 +77,8 @@ export class AuthPasswordService {
         code: ErrorCode.EMAIL_NOT_VERIFIED,
       });
     }
-    return this.authTokens.issueTokensForUser(user);
+    const tokens = await this.authTokens.issueTokensForUser(user);
+    return { tokens, user: this.toUserResponse(user) };
   }
 
   async refresh(dto: RefreshDto, ip?: string) {
@@ -76,22 +88,34 @@ export class AuthPasswordService {
       ttlMs: 60 * 1000,
     });
     const payload = await this.tokens.verifyRefreshToken(dto.refreshToken).catch(() => {
-      throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
+      throw new ProblemException(401, {
+        title: 'Invalid refresh token',
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
+      });
     });
     const tokenId = payload.jti as string;
     const userId = payload.sub as string;
     const record = await this.prisma.refreshToken.findUnique({ where: { id: tokenId } });
     if (!record || record.revoked || record.userId !== userId) {
-      throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
+      throw new ProblemException(401, {
+        title: 'Invalid refresh token',
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
+      });
     }
     const valid = await argon2.verify(record.tokenHash, dto.refreshToken).catch(() => false);
     if (!valid) {
-      throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
+      throw new ProblemException(401, {
+        title: 'Invalid refresh token',
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
+      });
     }
     await this.prisma.refreshToken.update({ where: { id: tokenId }, data: { revoked: true } });
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new ProblemException(401, { title: 'Invalid refresh token', code: ErrorCode.UNAUTHORIZED });
+      throw new ProblemException(401, {
+        title: 'Invalid refresh token',
+        code: ErrorCode.INVALID_REFRESH_TOKEN,
+      });
     }
     if (!user.emailVerified) {
       throw new ProblemException(403, {
@@ -100,59 +124,72 @@ export class AuthPasswordService {
         code: ErrorCode.EMAIL_NOT_VERIFIED,
       });
     }
-    return this.authTokens.issueTokensForUser(user);
+    const tokens = await this.authTokens.issueTokensForUser(user);
+    return tokens;
   }
 
   async logout(dto: RefreshDto) {
     const payload = await this.tokens.verifyRefreshToken(dto.refreshToken).catch(() => null);
-    if (!payload) return { success: true };
+    if (!payload) return;
     const tokenId = payload.jti as string;
     await this.prisma.refreshToken.updateMany({ where: { id: tokenId }, data: { revoked: true } });
-    return { success: true };
+    return;
   }
 
   async requestVerification(rawEmail: string) {
     const email = this.normalizeEmail(rawEmail);
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) return { success: true };
+    if (!user) return;
     const token = await this.pendingTokens.createEmailToken(user.id, 24 * 60 * 60 * 1000);
-    await this.prisma.user.update({ where: { id: user.id }, data: { verificationRequestedAt: new Date() } });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { verificationRequestedAt: new Date() },
+    });
     await this.email.sendVerification(email, token);
-    return { success: true };
+    return;
   }
 
   async confirmVerification(token: string) {
     const userId = await this.pendingTokens.consumeEmailToken(token);
     if (!userId) {
-      throw new ProblemException(400, { title: 'Invalid or expired token', code: ErrorCode.VALIDATION_FAILED });
+      throw new ProblemException(400, {
+        title: 'Invalid or expired token',
+        code: ErrorCode.VALIDATION_FAILED,
+      });
     }
     await this.prisma.user.update({
       where: { id: userId },
       data: { emailVerified: true, verificationRequestedAt: null },
     });
-    return { success: true };
+    return;
   }
 
   async requestPasswordReset(rawEmail: string) {
     const email = this.normalizeEmail(rawEmail);
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) return { success: true };
+    if (!user) return;
     const token = await this.pendingTokens.createResetToken(user.id, 30 * 60 * 1000);
     await this.email.sendPasswordReset(email, token);
-    return { success: true };
+    return;
   }
 
   async confirmPasswordReset(token: string, newPassword: string) {
     const userId = await this.pendingTokens.consumeResetToken(token);
     if (!userId) {
-      throw new ProblemException(400, { title: 'Invalid or expired token', code: ErrorCode.VALIDATION_FAILED });
+      throw new ProblemException(400, {
+        title: 'Invalid or expired token',
+        code: ErrorCode.VALIDATION_FAILED,
+      });
     }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw ProblemException.notFound('User not found');
     const passwordHash = await argon2.hash(newPassword, { type: argon2.argon2id });
     await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
-    await this.prisma.refreshToken.updateMany({ where: { userId: user.id }, data: { revoked: true } });
-    return { success: true };
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: user.id },
+      data: { revoked: true },
+    });
+    return;
   }
 
   private buildKey(type: string, identifier: string, ip?: string) {
@@ -163,5 +200,21 @@ export class AuthPasswordService {
 
   private normalizeEmail(email: string) {
     return email.trim().toLowerCase();
+  }
+
+  private toUserResponse(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    emailVerified: boolean;
+  }) {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      emailVerified: user.emailVerified,
+    };
   }
 }

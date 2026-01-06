@@ -9,7 +9,7 @@ import { EnrollChallengeResponse } from './dto/enroll-challenge.response';
 import { EnrollVerifyResponse } from './dto/enroll-verify.response';
 import type { EnrollChallengeDto } from './dto/enroll-challenge.dto';
 import type { EnrollVerifyDto } from './dto/enroll-verify.dto';
-import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server/esm/types';
+import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
 import { randomUUID } from 'crypto';
 
 interface EnrollmentChallengeState {

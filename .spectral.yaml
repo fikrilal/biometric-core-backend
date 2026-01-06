@@ -1,0 +1,26 @@
+extends:
+  - spectral:oas
+
+# Keep this ruleset minimal and pragmatic: enforce core OpenAPI correctness,
+# but avoid "style-only" failures that would block iteration.
+rules:
+  # Enterprise-grade contract hygiene: make documentation and correctness rules blocking.
+  info-contact: error
+  info-description: error
+  operation-description: error
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-success-response: error
+  oas3-api-servers: error
+  oas3-operation-security-defined: error
+  path-params: error
+
+  # Governance/compliance: require explicit licensing.
+  info-license: error
+  license-url: error
+
+  # Swagger UI is generated code-first and may not mirror every tag/grouping decision in `docs/openapi/openapi.yaml`.
+  operation-tags: off
+
+  # We deliberately keep some shared components around for forward-compat; don't fail builds on unused components.
+  oas3-unused-component: off

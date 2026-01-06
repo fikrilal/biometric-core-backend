@@ -8,6 +8,8 @@ import { EnrollVerifyDto } from './dto/enroll-verify.dto';
 import { EnrollVerifyResponse } from './dto/enroll-verify.response';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 @ApiTags('enrollment')
 @Controller('enroll')
@@ -24,7 +26,7 @@ export class EnrollmentController {
     @Req() req: FastifyRequest,
   ): Promise<EnrollChallengeResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.enrollment.createChallenge(user.userId, dto, req.ip);
   }

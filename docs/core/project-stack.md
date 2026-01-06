@@ -2,7 +2,7 @@
 
 ## Runtime & Language
 
-- **Node.js 24 LTS + TypeScript** for primary services (performance, modern language features, broad ecosystem).
+- **Node.js 22 LTS + TypeScript** for primary services (performance, modern language features, broad ecosystem).
 - **TypeScript project references** via monorepo tooling to enforce explicit module boundaries.
 - **Native extensions (Rust/WASM)** reserved for crypto-heavy paths if benchmarks prove necessary.
 

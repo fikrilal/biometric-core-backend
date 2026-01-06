@@ -14,6 +14,7 @@ This document defines consistent response shapes, headers, and status codes for 
 - Content type: `application/problem+json`.
 - Shape: `{ type, title, status, detail?, instance?, code, traceId }`.
 - Always include `traceId` (the `X-Request-Id` value) and a stable `code` for programmatic handling.
+- Error codes catalog: `docs/standards/error-codes.md`.
 
 ## Headers
 
@@ -27,6 +28,7 @@ This document defines consistent response shapes, headers, and status codes for 
 
 - GET (single/list): `200` with `{ data, meta? }`.
 - POST (create): `201` with `{ data }` and `Location`; if replay via Idempotency-Key, return `200` with `Idempotency-Replayed: true`.
+- POST (command/no resource): `204` No Content (no body).
 - PUT/PATCH: `200` with `{ data }`.
 - DELETE: `204` No Content (no body).
 - Async operations (if any): `202` with `{ data: { jobId } }`.
@@ -54,4 +56,3 @@ This document defines consistent response shapes, headers, and status codes for 
 - A global response interceptor will wrap controller returns into the envelope; opt-out with a `@SkipEnvelope` decorator when necessary.
 - A global exception filter will produce RFC 7807 with `traceId`.
 - Keep DTOs clean; the envelope is applied at the transport layer.
-

@@ -32,8 +32,11 @@ async function bootstrap() {
   app.setGlobalPrefix('v1', {
     exclude: [{ path: 'health', method: RequestMethod.GET }],
   });
-  const port = configService.get<number>('PORT', 3000);
-  await app.listen({ port, host: '0.0.0.0' });
+  const port = configService.get<number>('PORT', 4000);
+  const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+  const host =
+    configService.get<string>('HOST') ?? (nodeEnv === 'production' ? '0.0.0.0' : '127.0.0.1');
+  await app.listen({ port, host });
 }
 
 bootstrap();

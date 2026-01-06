@@ -5,6 +5,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { FastifyRequest } from 'fastify';
 import { PageQueryDto } from '../common/pagination/page-query.dto';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 @ApiTags('devices')
 @Controller('devices')
@@ -19,7 +21,7 @@ export class DevicesController {
     @Query() query: PageQueryDto,
   ) {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.devices.listForUser(user.userId, query.cursor, query.limit);
   }
@@ -29,9 +31,8 @@ export class DevicesController {
   @ApiOperation({ summary: 'Revoke a device by id' })
   async revoke(@CurrentUser() user: FastifyRequest['user'], @Param('id') id: string) {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     await this.devices.revoke(user.userId, id);
   }
 }
-

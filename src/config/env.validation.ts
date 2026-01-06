@@ -1,5 +1,5 @@
 import { plainToInstance, Transform } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min, validateSync } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min, validateSync } from 'class-validator';
 
 export enum NodeEnv {
   Development = 'development',
@@ -16,16 +16,31 @@ class EnvVars {
   @IsEnum(NodeEnv)
   NODE_ENV!: NodeEnv;
 
-  @Transform(({ value }) => (value !== undefined ? Number(value) : 3000))
+  @IsOptional()
+  @IsString()
+  HOST?: string;
+
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 4000))
   @IsInt()
   @Min(0)
-  PORT: number = 3000;
+  PORT: number = 4000;
 
   @IsString()
   DATABASE_URL!: string;
 
   @IsString()
   REDIS_URL!: string;
+
+  @Transform(({ value }) => {
+    if (value === undefined) return true;
+    if (typeof value === 'boolean') return value;
+    const raw = String(value).trim().toLowerCase();
+    if (raw === 'true' || raw === '1') return true;
+    if (raw === 'false' || raw === '0') return false;
+    return Boolean(raw);
+  })
+  @IsBoolean()
+  REDIS_TLS_REJECT_UNAUTHORIZED: boolean = true;
 
   @IsString()
   AUTH_JWT_ACCESS_SECRET!: string;
@@ -57,6 +72,18 @@ class EnvVars {
   @IsString()
   PASSWORD_RESET_URL?: string;
 
+  // Firebase Auth (Google login)
+  // Firebase project id used to verify Firebase ID tokens (aud / issuer) at /v1/auth/google.
+  @IsOptional()
+  @IsString()
+  FIREBASE_PROJECT_ID?: string;
+
+  // Deprecated: Google OIDC (previous social login implementation)
+  // Comma-separated list of allowed Google OAuth client IDs (audiences) for Google OIDC ID token verification.
+  @IsOptional()
+  @IsString()
+  GOOGLE_OIDC_CLIENT_IDS?: string;
+
   // WebAuthn / Biometric configuration
 
   @IsOptional()
@@ -68,7 +95,7 @@ class EnvVars {
   WEBAUTHN_RP_NAME?: string;
 
   /**
-   * Comma-separated list of allowed origins for WebAuthn (e.g. https://app.example.com,https://localhost:3000).
+   * Comma-separated list of allowed origins for WebAuthn (e.g. https://app.example.com,https://localhost:4000).
    */
   @IsOptional()
   @IsString()
@@ -119,6 +146,19 @@ export function validateEnv(config: Record<string, unknown>): EnvVars {
   }
   if (validated.RESEND_API_KEY && !validated.EMAIL_FROM_ADDRESS) {
     throw new Error('EMAIL_FROM_ADDRESS is required when RESEND_API_KEY is set');
+  }
+  if (validated.RESEND_API_KEY && validated.EMAIL_FROM_ADDRESS) {
+    const rawFrom = validated.EMAIL_FROM_ADDRESS.trim();
+    const extractedEmail = rawFrom.includes('<') && rawFrom.includes('>')
+      ? rawFrom.match(/<([^<>]+)>/)?.[1]?.trim()
+      : rawFrom;
+    const email = extractedEmail ?? '';
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!looksLikeEmail) {
+      throw new Error(
+        'EMAIL_FROM_ADDRESS must be an email (e.g., no-reply@example.com) or Name <no-reply@example.com>',
+      );
+    }
   }
   if (validated.NODE_ENV !== NodeEnv.Test) {
     if (!validated.WEBAUTHN_RP_ID) {

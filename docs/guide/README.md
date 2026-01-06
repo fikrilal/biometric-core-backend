@@ -19,6 +19,7 @@ This guide explains the core patterns used across the codebase so new features f
 - Errors are returned as `application/problem+json` with `traceId`.
 - Use `ProblemException` (prefer) or Nest `HttpException`—both map to RFC 7807.
 - Error codes live in `ErrorCode` enum for stability.
+- Error codes catalog (including per-endpoint mappings): `docs/standards/error-codes.md`.
 - 404 for unknown routes is handled globally.
 - Code references:
   - Filter: `src/common/http/filters/problem-details.filter.ts`
@@ -50,6 +51,7 @@ This guide explains the core patterns used across the codebase so new features f
 - Source of truth: `docs/openapi/openapi.yaml` (3.1).
 - Lint: `npm run spec:lint` (Spectral).
 - Swagger UI is served at `/docs` from code-first decorators.
+- Error codes per endpoint: each operation should include `x-error-codes` listing the possible `code` values (see `docs/standards/error-codes.md`).
 
 ## Auth Password Module
 - Specs: `docs/features/auth-password.md`.
@@ -72,4 +74,5 @@ This guide explains the core patterns used across the codebase so new features f
 - Accept `PageQueryDto` for lists; return `toPaginated(...)`.
 - Throw `ProblemException.*` for errors; include stable `ErrorCode`.
 - Respect `Idempotency-Key` on POST/DELETE (interceptor is global).
+- Use `204 No Content` for command-style endpoints that return no resource.
 - Add Swagger decorators to document the route; ensure OpenAPI stays aligned.

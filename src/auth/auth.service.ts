@@ -9,12 +9,12 @@ import { ErrorCode } from '../common/errors/error-codes';
 import type { BiometricChallengeDto } from './dto/biometric-challenge.dto';
 import type { BiometricChallengeResponse } from './dto/biometric-challenge.response';
 import type { BiometricVerifyDto } from './dto/biometric-verify.dto';
-import type { AuthTokensResponse } from '../auth-password/dto/auth.response';
+import type { AuthSessionResponse } from '../auth-password/dto/auth.response';
 import type {
   AuthenticatorTransportFuture,
   PublicKeyCredentialRequestOptionsJSON,
   WebAuthnCredential,
-} from '@simplewebauthn/server/esm/types';
+} from '@simplewebauthn/server';
 import { randomUUID } from 'crypto';
 import type { StepUpChallengeDto } from './dto/step-up-challenge.dto';
 import type { StepUpChallengeResponse } from './dto/step-up-challenge.response';
@@ -112,7 +112,7 @@ export class AuthService {
     };
   }
 
-  async verifyBiometricLogin(dto: BiometricVerifyDto): Promise<AuthTokensResponse> {
+  async verifyBiometricLogin(dto: BiometricVerifyDto): Promise<AuthSessionResponse> {
     const client = this.redis.getClient();
     const key = this.buildChallengeKey(dto.challengeId);
     const raw = await client.get(key);
@@ -203,7 +203,24 @@ export class AuthService {
 
     await this.enforceSignCount(user.id, credentialRecord, verification.newSignCount, 'login');
 
-    return this.authTokens.issueTokensForUser(user);
+    const tokens = await this.authTokens.issueTokensForUser(user);
+    return { tokens, user: this.toUserResponse(user) };
+  }
+
+  private toUserResponse(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    emailVerified: boolean;
+  }) {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      emailVerified: user.emailVerified,
+    };
   }
 
   private async resolveUser(dto: BiometricChallengeDto) {

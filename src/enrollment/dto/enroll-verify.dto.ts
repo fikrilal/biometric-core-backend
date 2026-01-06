@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsObject, IsString } from 'class-validator';
-import type { RegistrationResponseJSON } from '@simplewebauthn/server/esm/types';
+import type { RegistrationResponseJSON } from '@simplewebauthn/server';
 
 export class EnrollVerifyDto {
   @ApiProperty()

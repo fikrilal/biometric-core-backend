@@ -5,13 +5,15 @@ import { BiometricChallengeDto } from './dto/biometric-challenge.dto';
 import { BiometricChallengeResponse } from './dto/biometric-challenge.response';
 import { BiometricVerifyDto } from './dto/biometric-verify.dto';
 import type { FastifyRequest } from 'fastify';
-import { AuthTokensResponse } from '../auth-password/dto/auth.response';
+import { AuthSessionResponse } from '../auth-password/dto/auth.response';
 import { StepUpChallengeDto } from './dto/step-up-challenge.dto';
 import { StepUpChallengeResponse } from './dto/step-up-challenge.response';
 import { StepUpVerifyDto } from './dto/step-up-verify.dto';
 import { StepUpVerifyResponse } from './dto/step-up-verify.response';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -36,7 +38,7 @@ export class AuthController {
   @Post('verify')
   @HttpCode(200)
   @ApiOperation({ summary: 'Verify biometric authentication and issue tokens' })
-  verify(@Body() dto: BiometricVerifyDto): Promise<AuthTokensResponse> {
+  verify(@Body() dto: BiometricVerifyDto): Promise<AuthSessionResponse> {
     return this.authService.verifyBiometricLogin(dto);
   }
 
@@ -50,7 +52,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
   ): Promise<StepUpChallengeResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.authService.createStepUpChallenge(user.userId, dto, req.ip);
   }
@@ -64,7 +66,7 @@ export class AuthController {
     @Body() dto: StepUpVerifyDto,
   ): Promise<StepUpVerifyResponse> {
     if (!user) {
-      throw new Error('Missing authenticated user in request');
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
     }
     return this.authService.verifyStepUp(user.userId, dto);
   }

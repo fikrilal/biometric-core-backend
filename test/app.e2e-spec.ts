@@ -5,10 +5,16 @@ import * as request from 'supertest';
 import { Logger } from 'nestjs-pino';
 import { MockEmailService } from '../src/auth-password/email.service';
 import { ErrorCode } from '../src/common/errors/error-codes';
-import { WebAuthnService, type WebAuthnExistingCredential, type WebAuthnUserDescriptor } from '../src/webauthn/webauthn.service';
+import {
+  WebAuthnService,
+  type WebAuthnExistingCredential,
+  type WebAuthnUserDescriptor,
+} from '../src/webauthn/webauthn.service';
 import { WebauthnSignCountMode } from '../src/config/env.validation';
 import { TokenService } from '../src/auth-password/token.service';
 import { PrismaClient } from '@prisma/client';
+import * as fs from 'fs';
+import { FirebaseAuthService } from '../src/auth-google/firebase-auth.service';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
@@ -18,6 +24,24 @@ import type {
 } from '@simplewebauthn/server/esm/types';
 
 const prisma = new PrismaClient();
+
+function resolveDefaultRedisUrlForTests() {
+  if (process.env.REDIS_URL) return process.env.REDIS_URL;
+  const fallback = 'redis://localhost:6380';
+  if (process.platform !== 'linux') return fallback;
+  try {
+    const osRelease = fs.readFileSync('/proc/sys/kernel/osrelease', 'utf8');
+    const isWsl = /microsoft/i.test(osRelease);
+    if (!isWsl) return fallback;
+    const resolvConf = fs.readFileSync('/etc/resolv.conf', 'utf8');
+    const match = resolvConf.match(/^nameserver\s+(\S+)/m);
+    const windowsHost = match?.[1];
+    if (!windowsHost) return fallback;
+    return `redis://${windowsHost}:6380`;
+  } catch {
+    return fallback;
+  }
+}
 
 async function registerAndVerifyUser(
   server: Parameters<typeof request>[0],
@@ -38,7 +62,7 @@ async function registerAndVerifyUser(
   await request(server)
     .post('/v1/auth/password/verify/confirm')
     .send({ token: verifyToken })
-    .expect(200);
+    .expect(204);
 }
 
 async function loginUser(server: Parameters<typeof request>[0], email: string, password: string) {
@@ -46,7 +70,7 @@ async function loginUser(server: Parameters<typeof request>[0], email: string, p
     .post('/v1/auth/password/login')
     .send({ email, password })
     .expect(200);
-  return login.body.data.accessToken as string;
+  return login.body.data.tokens.accessToken as string;
 }
 
 function buildFakeRegistration(credentialId: string): RegistrationResponseJSON {
@@ -152,10 +176,7 @@ class FakeWebAuthnService {
     };
   }
 
-  async verifyRegistration(
-    response: RegistrationResponseJSON,
-    _expectedChallenge: string,
-  ) {
+  async verifyRegistration(response: RegistrationResponseJSON, _expectedChallenge: string) {
     // In tests we trust the wiring and ignore the actual challenge value.
     // Always treat the response as a valid registration.
     return {
@@ -189,6 +210,46 @@ class FakeWebAuthnService {
   }
 }
 
+class FakeFirebaseAuthService {
+  async verifyIdToken(idToken: string) {
+    if (idToken === 'google:new') {
+      return {
+        sub: `google-sub-${Date.now()}`,
+        email: `google-${Date.now()}@example.com`,
+        email_verified: true,
+        name: 'Google User',
+        firebase: { sign_in_provider: 'google.com' },
+      };
+    }
+
+    const existingMatch = idToken.match(/^google:existing:(.+)$/);
+    if (existingMatch) {
+      const email = existingMatch[1];
+      return {
+        sub: `google-sub-existing:${email}`,
+        email,
+        email_verified: true,
+        name: 'Existing User',
+        firebase: { sign_in_provider: 'google.com' },
+      };
+    }
+
+    const otherMatch = idToken.match(/^google:other:(.+)$/);
+    if (otherMatch) {
+      const email = otherMatch[1];
+      return {
+        sub: `google-sub-other:${email}`,
+        email,
+        email_verified: true,
+        name: 'Other User',
+        firebase: { sign_in_provider: 'google.com' },
+      };
+    }
+
+    throw new Error('invalid token');
+  }
+}
+
 describe('App e2e (health)', () => {
   console.log('TEST DATABASE_URL', process.env.DATABASE_URL);
   let app: INestApplication;
@@ -205,8 +266,8 @@ describe('App e2e (health)', () => {
     process.env.NODE_ENV = process.env.NODE_ENV || 'test';
     process.env.DATABASE_URL =
       process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/biometric_core?schema=public';
-    process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6380';
+      'postgresql://postgres:asalbaca@localhost:5433/biometric_core?schema=public';
+    process.env.REDIS_URL = resolveDefaultRedisUrlForTests();
 
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({
@@ -214,6 +275,8 @@ describe('App e2e (health)', () => {
     })
       .overrideProvider(WebAuthnService)
       .useClass(FakeWebAuthnService)
+      .overrideProvider(FirebaseAuthService)
+      .useClass(FakeFirebaseAuthService)
       .compile();
 
     app = await moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
@@ -232,7 +295,9 @@ describe('App e2e (health)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
     await prisma.$disconnect();
   });
 
@@ -242,18 +307,18 @@ describe('App e2e (health)', () => {
 
   it('/health (GET)', async () => {
     const server = getServer();
-    await request(server).get('/health').expect(200).expect(({ body }) => {
-      expect(body.status).toBe('ok');
-    });
+    await request(server)
+      .get('/health')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.status).toBe('ok');
+      });
   });
 
   it('/v1/auth/ping (GET) returns envelope and echoes X-Request-Id', async () => {
     const server = getServer();
     const reqId = 'e2e-test-req-1';
-    const res = await request(server)
-      .get('/v1/auth/ping')
-      .set('X-Request-Id', reqId)
-      .expect(200);
+    const res = await request(server).get('/v1/auth/ping').set('X-Request-Id', reqId).expect(200);
 
     expect(res.headers['x-request-id']).toBe(reqId);
     expect(res.body).toEqual({ data: { ok: true } });
@@ -287,9 +352,7 @@ describe('App e2e (health)', () => {
     expect(createRes.body.data.lastName).toBe(lastName);
     const userId = createRes.body.data.id;
 
-    const listRes = await request(server)
-      .get('/v1/users?limit=1')
-      .expect(200);
+    const listRes = await request(server).get('/v1/users?limit=1').expect(200);
     expect(Array.isArray(listRes.body.data)).toBe(true);
     expect(listRes.body.meta).toHaveProperty('limit');
 
@@ -298,6 +361,27 @@ describe('App e2e (health)', () => {
     expect(getRes.body.data.email).toBe(email);
     expect(getRes.body.data.firstName).toBe(firstName);
     expect(getRes.body.data.lastName).toBe(lastName);
+  });
+
+  it('users module supports /v1/users/me (current user)', async () => {
+    const server = getServer();
+    const email = `me-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    const firstName = 'Me';
+    const lastName = 'User';
+
+    await registerAndVerifyUser(server, { email, password, firstName, lastName });
+    const accessToken = await loginUser(server, email, password);
+
+    const res = await request(server)
+      .get('/v1/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(res.body.data.id).toBeDefined();
+    expect(res.body.data.email).toBe(email.toLowerCase());
+    expect(res.body.data.firstName).toBe(firstName);
+    expect(res.body.data.lastName).toBe(lastName);
   });
 
   it('password auth flow (register/login/refresh/logout)', async () => {
@@ -309,8 +393,8 @@ describe('App e2e (health)', () => {
       .post('/v1/auth/password/register')
       .send({ email, password, firstName: 'Auth', lastName: 'User' })
       .expect(201);
-    expect(register.body.data.accessToken).toBeDefined();
-    expect(register.body.data.refreshToken).toBeDefined();
+    expect(register.body.data.tokens.accessToken).toBeDefined();
+    expect(register.body.data.tokens.refreshToken).toBeDefined();
 
     // Verify email before login (required by the system)
     const verifyToken = MockEmailService.pullLatestVerificationToken(email);
@@ -318,24 +402,30 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     const login = await request(server)
       .post('/v1/auth/password/login')
       .send({ email, password })
       .expect(200);
-    expect(login.body.data.accessToken).toBeDefined();
+    expect(login.body.data.tokens.accessToken).toBeDefined();
+    expect(login.body.data.user).toBeDefined();
+    expect(login.body.data.user.email).toBe(email.toLowerCase());
+    expect(login.body.data.user.firstName).toBe('Auth');
+    expect(login.body.data.user.lastName).toBe('User');
 
     const refresh = await request(server)
       .post('/v1/auth/password/refresh')
-      .send({ refreshToken: login.body.data.refreshToken })
+      .send({ refreshToken: login.body.data.tokens.refreshToken })
       .expect(200);
     expect(refresh.body.data.accessToken).toBeDefined();
+    expect(refresh.body.data.refreshToken).toBeDefined();
+    expect(refresh.body.data.expiresIn).toBeDefined();
 
     await request(server)
       .post('/v1/auth/password/logout')
-      .send({ refreshToken: login.body.data.refreshToken })
-      .expect(200);
+      .send({ refreshToken: login.body.data.tokens.refreshToken })
+      .expect(204);
   });
 
   it('requires email verification before login/refresh', async () => {
@@ -348,16 +438,13 @@ describe('App e2e (health)', () => {
       .send({ email, password, firstName: 'Verify', lastName: 'User' })
       .expect(201);
 
-    expect(register.body.data.emailVerified).toBe(false);
+    expect(register.body.data.user.emailVerified).toBe(false);
 
-    await request(server)
-      .post('/v1/auth/password/login')
-      .send({ email, password })
-      .expect(403);
+    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(403);
 
     await request(server)
       .post('/v1/auth/password/refresh')
-      .send({ refreshToken: register.body.data.refreshToken })
+      .send({ refreshToken: register.body.data.tokens.refreshToken })
       .expect(403);
 
     const verifyToken = MockEmailService.pullLatestVerificationToken(email);
@@ -366,14 +453,14 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     const login = await request(server)
       .post('/v1/auth/password/login')
       .send({ email, password })
       .expect(200);
 
-    expect(login.body.data.emailVerified).toBe(true);
+    expect(login.body.data.user.emailVerified).toBe(true);
   });
 
   it('supports password reset flow', async () => {
@@ -392,17 +479,11 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
-    await request(server)
-      .post('/v1/auth/password/login')
-      .send({ email, password })
-      .expect(200);
+    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(200);
 
-    await request(server)
-      .post('/v1/auth/password/reset/request')
-      .send({ email })
-      .expect(200);
+    await request(server).post('/v1/auth/password/reset/request').send({ email }).expect(204);
 
     const resetToken = MockEmailService.pullLatestResetToken(email);
     expect(resetToken).toBeDefined();
@@ -411,19 +492,16 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/reset/confirm')
       .send({ token: resetToken, newPassword })
-      .expect(200);
+      .expect(204);
 
-    await request(server)
-      .post('/v1/auth/password/login')
-      .send({ email, password })
-      .expect(401);
+    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(401);
 
     const loginNew = await request(server)
       .post('/v1/auth/password/login')
       .send({ email, password: newPassword })
       .expect(200);
 
-    expect(loginNew.body.data.emailVerified).toBe(true);
+    expect(loginNew.body.data.user.emailVerified).toBe(true);
   });
 
   it('supports enrollment and biometric login flow (happy path with fake WebAuthn)', async () => {
@@ -443,7 +521,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     // Login with password to get access token
     const login = await request(server)
@@ -451,7 +529,7 @@ describe('App e2e (health)', () => {
       .send({ email, password })
       .expect(200);
 
-    const accessToken: string = login.body.data.accessToken;
+    const accessToken: string = login.body.data.tokens.accessToken;
     expect(accessToken).toBeDefined();
 
     // Create enrollment challenge (requires JWT)
@@ -523,9 +601,9 @@ describe('App e2e (health)', () => {
       })
       .expect(200);
 
-    expect(authVerify.body.data.accessToken).toBeDefined();
-    expect(authVerify.body.data.refreshToken).toBeDefined();
-    expect(authVerify.body.data.emailVerified).toBe(true);
+    expect(authVerify.body.data.tokens.accessToken).toBeDefined();
+    expect(authVerify.body.data.tokens.refreshToken).toBeDefined();
+    expect(authVerify.body.data.user.emailVerified).toBe(true);
   });
 
   it('supports step-up biometric flow with fake WebAuthn', async () => {
@@ -539,7 +617,7 @@ describe('App e2e (health)', () => {
       .send({ email, password, firstName: 'Step', lastName: 'Up' })
       .expect(201);
 
-    expect(register.body.data.accessToken).toBeDefined();
+    expect(register.body.data.tokens.accessToken).toBeDefined();
 
     // Verify email
     const verifyToken = MockEmailService.pullLatestVerificationToken(email);
@@ -547,7 +625,7 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     // Login with password to get access token
     const login = await request(server)
@@ -555,7 +633,7 @@ describe('App e2e (health)', () => {
       .send({ email, password })
       .expect(200);
 
-    const accessToken: string = login.body.data.accessToken;
+    const accessToken: string = login.body.data.tokens.accessToken;
     expect(accessToken).toBeDefined();
 
     // Enroll a device for the user
@@ -651,13 +729,13 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: verifyToken })
-      .expect(200);
+      .expect(204);
 
     const login = await request(server)
       .post('/v1/auth/password/login')
       .send({ email, password })
       .expect(200);
-    const accessToken = login.body.data.accessToken as string;
+    const accessToken = login.body.data.tokens.accessToken as string;
     expect(typeof accessToken).toBe('string');
 
     const walletRes = await request(server)
@@ -694,11 +772,11 @@ describe('App e2e (health)', () => {
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: senderVerify })
-      .expect(200);
+      .expect(204);
     await request(server)
       .post('/v1/auth/password/verify/confirm')
       .send({ token: recipientVerify })
-      .expect(200);
+      .expect(204);
 
     const senderLogin = await request(server)
       .post('/v1/auth/password/login')
@@ -709,8 +787,8 @@ describe('App e2e (health)', () => {
       .send({ email: recipientEmail, password })
       .expect(200);
 
-    const senderToken = senderLogin.body.data.accessToken as string;
-    const recipientToken = recipientLogin.body.data.accessToken as string;
+    const senderToken = senderLogin.body.data.tokens.accessToken as string;
+    const recipientToken = recipientLogin.body.data.tokens.accessToken as string;
 
     await request(server)
       .get('/v1/wallets/me')
@@ -824,6 +902,70 @@ describe('App e2e (health)', () => {
 
     expect(transfer.body.data.stepUpUsed).toBe(true);
     expect(transfer.body.data.amountMinor).toBe(6_000_000);
+  });
+
+  it('supports Google login/register and connect flow', async () => {
+    const server = getServer();
+
+    // Register/login with Google should create a new user and return session tokens
+    const googleAuth = await request(server)
+      .post('/v1/auth/google')
+      .send({ idToken: 'google:new' })
+      .expect(200);
+
+    expect(googleAuth.body.data.tokens.accessToken).toBeDefined();
+    expect(googleAuth.body.data.tokens.refreshToken).toBeDefined();
+    expect(googleAuth.body.data.user.email).toMatch(/@example\.com$/);
+    expect(googleAuth.body.data.user.emailVerified).toBe(true);
+
+    // Create a password user, then connect Google (email must match)
+    const email = `existing-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    await registerAndVerifyUser(server, {
+      email,
+      password,
+      firstName: 'Existing',
+      lastName: 'User',
+    });
+    const accessToken = await loginUser(server, email, password);
+
+    await request(server)
+      .post('/v1/auth/google/connect')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ idToken: `google:existing:${email}` })
+      .expect(204);
+
+    // After connecting, Google auth should log in to the same user (by provider link)
+    const googleAuthAgain = await request(server)
+      .post('/v1/auth/google')
+      .send({ idToken: `google:existing:${email}` })
+      .expect(200);
+    expect(googleAuthAgain.body.data.user.email).toBe(email.toLowerCase());
+
+    // Connecting a Google account already linked to another user should conflict
+    const otherEmail = `other-${Date.now()}@example.com`;
+    await registerAndVerifyUser(server, {
+      email: otherEmail,
+      password,
+      firstName: 'Other',
+      lastName: 'User',
+    });
+    const otherAccess = await loginUser(server, otherEmail, password);
+
+    // First connect "google:other-user" to the other user (ok)
+    await request(server)
+      .post('/v1/auth/google/connect')
+      .set('Authorization', `Bearer ${otherAccess}`)
+      .send({ idToken: `google:other:${otherEmail}` })
+      .expect(204);
+
+    // Then attempt to connect the same Google account to the original user -> 409
+    const conflict = await request(server)
+      .post('/v1/auth/google/connect')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ idToken: `google:other:${otherEmail}` })
+      .expect(403);
+    expect(conflict.body.code).toBe(ErrorCode.FORBIDDEN);
   });
 
   it('rejects transfers that violate funds, limits, or missing recipients', async () => {

@@ -9,17 +9,14 @@ import {
   type GenerateAuthenticationOptionsOpts,
   type VerifyRegistrationResponseOpts,
   type VerifyAuthenticationResponseOpts,
+  type PublicKeyCredentialCreationOptionsJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
+  type RegistrationResponseJSON,
+  type AuthenticationResponseJSON,
+  type WebAuthnCredential,
+  type Base64URLString,
+  type AuthenticatorTransportFuture,
 } from '@simplewebauthn/server';
-import type {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-  RegistrationResponseJSON,
-  AuthenticationResponseJSON,
-  WebAuthnCredential,
-  Base64URLString,
-  AuthenticatorTransportFuture,
-  Uint8Array_,
-} from '@simplewebauthn/server/esm/types';
 import { WebauthnSignCountMode } from '../config/env.validation';
 
 export interface WebAuthnUserDescriptor {
@@ -35,7 +32,7 @@ export interface WebAuthnExistingCredential {
 
 export interface WebAuthnRegistrationResult {
   credentialID: Base64URLString;
-  credentialPublicKey: Uint8Array_;
+  credentialPublicKey: Uint8Array;
   signCount: number;
   aaguid: string;
 }
@@ -169,8 +166,8 @@ export class WebAuthnService {
   /**
    * Convert a UTF-8 string to Uint8Array for userID.
   */
-  private toUint8Array(value: string): Uint8Array_ {
-    return new TextEncoder().encode(value) as Uint8Array_;
+  private toUint8Array(value: string): Uint8Array<ArrayBuffer> {
+    return new TextEncoder().encode(value) as Uint8Array<ArrayBuffer>;
   }
 
   private parseTransports(
