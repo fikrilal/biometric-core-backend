@@ -78,12 +78,6 @@ class EnvVars {
   @IsString()
   FIREBASE_PROJECT_ID?: string;
 
-  // Deprecated: Google OIDC (previous social login implementation)
-  // Comma-separated list of allowed Google OAuth client IDs (audiences) for Google OIDC ID token verification.
-  @IsOptional()
-  @IsString()
-  GOOGLE_OIDC_CLIENT_IDS?: string;
-
   // WebAuthn / Biometric configuration
 
   @IsOptional()
