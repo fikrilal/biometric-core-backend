@@ -594,6 +594,43 @@ describe('App e2e (health)', () => {
     expect(res.body.code).toBe(ErrorCode.INVALID_CREDENTIALS);
   });
 
+  it('supports global sign-out by revoking all refresh tokens', async () => {
+    const server = getServer();
+    const email = `sessions-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    const session1 = await createVerifiedPasswordUserSession(server, {
+      email,
+      password,
+      firstName: 'Sessions',
+      lastName: 'User',
+    });
+    const session2 = await loginUserSession(server, email, password);
+
+    await request(server)
+      .post('/v1/auth/sessions/revoke')
+      .set('Authorization', `Bearer ${session1.accessToken}`)
+      .expect(204);
+
+    const refresh1 = await request(server)
+      .post('/v1/auth/password/refresh')
+      .send({ refreshToken: session1.refreshToken })
+      .expect(401);
+    expect(refresh1.body.code).toBe(ErrorCode.INVALID_REFRESH_TOKEN);
+
+    const refresh2 = await request(server)
+      .post('/v1/auth/password/refresh')
+      .send({ refreshToken: session2.refreshToken })
+      .expect(401);
+    expect(refresh2.body.code).toBe(ErrorCode.INVALID_REFRESH_TOKEN);
+  });
+
+  it('rejects global sign-out without auth', async () => {
+    const server = getServer();
+    const res = await request(server).post('/v1/auth/sessions/revoke').expect(401);
+    expect(res.body.code).toBe(ErrorCode.UNAUTHORIZED);
+  });
+
   it('supports enrollment and biometric login flow (happy path with fake WebAuthn)', async () => {
     const server = getServer();
     const email = `bio-${Date.now()}@example.com`;
