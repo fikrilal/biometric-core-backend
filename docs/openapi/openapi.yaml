@@ -1133,6 +1133,45 @@ paths:
               $ref: '#/components/headers/XRequestId'
         default:
           $ref: '#/components/responses/Problem'
+
+  /v1/auth/password/change:
+    post:
+      tags: [Auth]
+      summary: Change password
+      description: Changes the current user's password and rotates session tokens.
+      operationId: passwordChange
+      x-error-codes:
+        - VALIDATION_FAILED
+        - UNAUTHORIZED
+        - INVALID_CREDENTIALS
+        - CONFLICT
+        - NOT_FOUND
+        - INTERNAL
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, minLength: 8 }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: New session tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvelopeAuthSession' }
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+        default:
+          $ref: '#/components/responses/Problem'
+      security:
+        - bearerAuth: []
   /v1/auth/password/verify/request:
     post:
       tags: [Auth]

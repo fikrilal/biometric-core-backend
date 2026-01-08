@@ -67,6 +67,8 @@ Notes:
   - `VALIDATION_FAILED`, `INVALID_REFRESH_TOKEN`, `EMAIL_NOT_VERIFIED`, `RATE_LIMITED`
 - `POST /v1/auth/password/logout`
   - `VALIDATION_FAILED`
+- `POST /v1/auth/password/change`
+  - `VALIDATION_FAILED`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `CONFLICT`, `NOT_FOUND`, `INTERNAL`
 - `POST /v1/auth/password/verify/request`
   - `VALIDATION_FAILED`, `INTERNAL` (email provider failures)
 - `POST /v1/auth/password/verify/confirm`
