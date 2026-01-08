@@ -66,11 +66,32 @@ async function registerAndVerifyUser(
 }
 
 async function loginUser(server: Parameters<typeof request>[0], email: string, password: string) {
+  const { accessToken } = await loginUserSession(server, email, password);
+  return accessToken;
+}
+
+async function loginUserSession(
+  server: Parameters<typeof request>[0],
+  email: string,
+  password: string,
+) {
   const login = await request(server)
     .post('/v1/auth/password/login')
     .send({ email, password })
     .expect(200);
-  return login.body.data.tokens.accessToken as string;
+  return {
+    accessToken: login.body.data.tokens.accessToken as string,
+    refreshToken: login.body.data.tokens.refreshToken as string,
+    user: login.body.data.user as { id: string; email: string },
+  };
+}
+
+async function createVerifiedPasswordUserSession(
+  server: Parameters<typeof request>[0],
+  input: { email: string; password: string; firstName: string; lastName: string },
+) {
+  await registerAndVerifyUser(server, input);
+  return loginUserSession(server, input.email, input.password);
 }
 
 function buildFakeRegistration(credentialId: string): RegistrationResponseJSON {
@@ -468,20 +489,12 @@ describe('App e2e (health)', () => {
     const email = `reset-${Date.now()}@example.com`;
     const password = 'Password123!';
 
-    await request(server)
-      .post('/v1/auth/password/register')
-      .send({ email, password, firstName: 'Reset', lastName: 'User' })
-      .expect(201);
-
-    const verifyToken = MockEmailService.pullLatestVerificationToken(email);
-    expect(verifyToken).toBeDefined();
-
-    await request(server)
-      .post('/v1/auth/password/verify/confirm')
-      .send({ token: verifyToken })
-      .expect(204);
-
-    await request(server).post('/v1/auth/password/login').send({ email, password }).expect(200);
+    await createVerifiedPasswordUserSession(server, {
+      email,
+      password,
+      firstName: 'Reset',
+      lastName: 'User',
+    });
 
     await request(server).post('/v1/auth/password/reset/request').send({ email }).expect(204);
 
@@ -502,6 +515,83 @@ describe('App e2e (health)', () => {
       .expect(200);
 
     expect(loginNew.body.data.user.emailVerified).toBe(true);
+  });
+
+  it('supports change password flow and rotates tokens', async () => {
+    const server = getServer();
+    const email = `change-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    const newPassword = 'Password456!';
+
+    const session = await createVerifiedPasswordUserSession(server, {
+      email,
+      password,
+      firstName: 'Change',
+      lastName: 'Password',
+    });
+
+    const changed = await request(server)
+      .post('/v1/auth/password/change')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .send({ currentPassword: password, newPassword })
+      .expect(200);
+
+    expect(changed.body.data.tokens.accessToken).toBeDefined();
+    expect(changed.body.data.tokens.refreshToken).toBeDefined();
+    expect(changed.body.data.user.email).toBe(email.toLowerCase());
+
+    const refreshAfterChange = await request(server)
+      .post('/v1/auth/password/refresh')
+      .send({ refreshToken: session.refreshToken })
+      .expect(401);
+    expect(refreshAfterChange.body.code).toBe(ErrorCode.INVALID_REFRESH_TOKEN);
+
+    const oldPasswordLogin = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password })
+      .expect(401);
+    expect(oldPasswordLogin.body.code).toBe(ErrorCode.INVALID_CREDENTIALS);
+
+    await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password: newPassword })
+      .expect(200);
+  });
+
+  it('rejects change password without auth', async () => {
+    const server = getServer();
+    const res = await request(server)
+      .post('/v1/auth/password/change')
+      .send({ currentPassword: 'Password123!', newPassword: 'Password456!' })
+      .expect(401);
+    expect(res.body.code).toBe(ErrorCode.UNAUTHORIZED);
+  });
+
+  it('rejects change password with wrong current password', async () => {
+    const server = getServer();
+    const email = `wrong-${Date.now()}@example.com`;
+    const password = 'Password123!';
+
+    await registerAndVerifyUser(server, {
+      email,
+      password,
+      firstName: 'Wrong',
+      lastName: 'Password',
+    });
+
+    const login = await request(server)
+      .post('/v1/auth/password/login')
+      .send({ email, password })
+      .expect(200);
+
+    const accessToken = login.body.data.tokens.accessToken as string;
+
+    const res = await request(server)
+      .post('/v1/auth/password/change')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ currentPassword: 'Password999!', newPassword: 'Password456!' })
+      .expect(401);
+    expect(res.body.code).toBe(ErrorCode.INVALID_CREDENTIALS);
   });
 
   it('supports enrollment and biometric login flow (happy path with fake WebAuthn)', async () => {
