@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Res, Req } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Res, Req, UseGuards } from '@nestjs/common';
 import { ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthPasswordService } from './auth-password.service';
 import { RegisterDto } from './dto/register.dto';
@@ -9,6 +9,12 @@ import { VerifyConfirmDto } from './dto/verify-confirm.dto';
 import { ResetRequestDto } from './dto/reset-request.dto';
 import { ResetConfirmDto } from './dto/reset-confirm.dto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { ProblemException } from '../common/errors/problem.exception';
+import { ErrorCode } from '../common/errors/error-codes';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AuthSessionResponse } from './dto/auth.response';
 
 @ApiTags('auth-password')
 @Controller('auth/password')
@@ -43,6 +49,20 @@ export class AuthPasswordController {
   @ApiNoContentResponse({ description: 'No Content' })
   async logout(@Body() dto: RefreshDto): Promise<void> {
     await this.service.logout(dto);
+  }
+
+  @Post('change')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Change password for current user' })
+  changePassword(
+    @CurrentUser() user: FastifyRequest['user'],
+    @Body() dto: ChangePasswordDto,
+  ): Promise<AuthSessionResponse> {
+    if (!user) {
+      throw new ProblemException(401, { title: 'Unauthorized', code: ErrorCode.UNAUTHORIZED });
+    }
+    return this.service.changePassword(user.userId, dto);
   }
 
   @Post('verify/request')
