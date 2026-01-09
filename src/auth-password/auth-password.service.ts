@@ -11,6 +11,8 @@ import { PendingTokenService } from './tokens/pending-token.service';
 import { EmailService } from './email.service';
 import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service';
 import { AuthTokensService } from './auth-tokens.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AuthSessionResponse } from './dto/auth.response';
 
 @Injectable()
 export class AuthPasswordService {
@@ -134,6 +136,36 @@ export class AuthPasswordService {
     const tokenId = payload.jti as string;
     await this.prisma.refreshToken.updateMany({ where: { id: tokenId }, data: { revoked: true } });
     return;
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<AuthSessionResponse> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw ProblemException.notFound('User not found');
+    }
+    if (!user.passwordHash) {
+      throw ProblemException.conflict('Password is not set for this account');
+    }
+
+    const valid = await argon2.verify(user.passwordHash, dto.currentPassword).catch(() => false);
+    if (!valid) {
+      throw new ProblemException(401, {
+        title: 'Invalid credentials',
+        code: ErrorCode.INVALID_CREDENTIALS,
+      });
+    }
+
+    const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
+    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+
+    // Revoke all outstanding refresh tokens (logout other sessions/devices).
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: user.id },
+      data: { revoked: true },
+    });
+
+    const tokens = await this.authTokens.issueTokensForUser(user);
+    return { tokens, user: this.toUserResponse(user) };
   }
 
   async requestVerification(rawEmail: string) {

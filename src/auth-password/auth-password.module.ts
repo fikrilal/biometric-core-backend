@@ -8,6 +8,7 @@ import { PendingTokenService } from './tokens/pending-token.service';
 import { MockEmailService, ResendEmailService, emailServiceProvider } from './email.service';
 import { RateLimiterService } from '../common/rate-limiter/rate-limiter.service';
 import { AuthTokensService } from './auth-tokens.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
@@ -18,6 +19,7 @@ import { AuthTokensService } from './auth-tokens.service';
     TokenService,
     PendingTokenService,
     RateLimiterService,
+    JwtAuthGuard,
     ResendEmailService,
     MockEmailService,
     emailServiceProvider,
